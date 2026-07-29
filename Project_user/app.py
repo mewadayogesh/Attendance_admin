@@ -45,9 +45,9 @@ db.init_app(app)
 # committed to source control or shared in plaintext anywhere, treat it as
 # compromised and rotate/regenerate it in your Google Account security
 # settings regardless of whether this app is public.
-MAIL_SENDER_EMAIL = os.environ.get('digitalcrest781@gmail.com', '')
-MAIL_SENDER_PASSWORD = os.environ.get('Crest@2005#dnd@2', '')
-MAIL_RECIPIENT_EMAIL = os.environ.get('ymewada6262@gmail.com', '')
+MAIL_SENDER_EMAIL = os.environ.get('MAIL_SENDER_EMAIL', '')
+MAIL_SENDER_PASSWORD = os.environ.get('MAIL_SENDER_PASSWORD', '')
+MAIL_RECIPIENT_EMAIL = os.environ.get('MAIL_RECIPIENT_EMAIL', '')
 
 
 # ---------------------------------------------------------------------------
