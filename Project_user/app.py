@@ -5,6 +5,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import io
 import os
+import traceback
 import calendar as cal
 from datetime import datetime
 from functools import wraps
@@ -1170,26 +1171,31 @@ def send_attendance_email():
         )
         return redirect(url_for('report_leave'))
 
-    # Build the same attendance report the download button produces.
-    headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-    xlsx_buffer = build_xlsx_buffer(headers, data)
-
-    subject = "Attendance Report"
-    body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
-
-    msg = MIMEMultipart()
-    msg['From'] = MAIL_SENDER_EMAIL
-    msg['To'] = MAIL_RECIPIENT_EMAIL
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
-
-    attachment = MIMEBase('application', 'octet-stream')
-    attachment.set_payload(xlsx_buffer.read())
-    encoders.encode_base64(attachment)
-    attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-    msg.attach(attachment)
-
+    # Everything below is wrapped in one try/except so ANY failure here
+    # (a bad DB query, a bad attachment build, or the SMTP call itself)
+    # ends in a flash + redirect instead of an unhandled 500 error page.
+    # The full traceback still gets printed to the server logs (visible
+    # in Render's "Logs" tab) so the real cause is easy to find.
     try:
+        # Build the same attendance report the download button produces.
+        headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
+        xlsx_buffer = build_xlsx_buffer(headers, data)
+
+        subject = "Attendance Report"
+        body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+
+        msg = MIMEMultipart()
+        msg['From'] = MAIL_SENDER_EMAIL
+        msg['To'] = MAIL_RECIPIENT_EMAIL
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        attachment = MIMEBase('application', 'octet-stream')
+        attachment.set_payload(xlsx_buffer.read())
+        encoders.encode_base64(attachment)
+        attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+        msg.attach(attachment)
+
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD)
@@ -1198,6 +1204,11 @@ def send_attendance_email():
 
         flash('Attendance report sent to your email successfully!', 'success')
     except Exception as e:
+        # Print the full traceback to server logs (stdout -> visible in
+        # Render's Logs tab) so the real cause is diagnosable, while the
+        # user just sees a short, non-technical flash message.
+        app.logger.error("send_attendance_email failed: %s", e)
+        traceback.print_exc()
         flash(f'Failed to send email: {e}', 'error')
 
     return redirect(url_for('report_leave'))
