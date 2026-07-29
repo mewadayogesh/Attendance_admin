@@ -1151,67 +1151,103 @@ def user_request():
     # Insert logic here...
 
     return render_template('user_request.html', employee_id=auto_employee_id)
-
-
+#email code
 @app.route('/send-attendance-email', methods=['POST'])
 @login_required
 def send_attendance_email():
-    """Email the current attendance report (as an .xlsx attachment) to the
-    configured recipient.
+    sender_email = os.environ.get('MAIL_SENDER_EMAIL')
+    sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
+    recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
+    
+    # Use your alternative provider's SMTP host (e.g., Brevo, SendGrid, or Office365)
+    smtp_host = os.environ.get('MAIL_SMTP_HOST', 'smtp-relay.brevo.com')
+    smtp_port = int(os.environ.get('MAIL_SMTP_PORT', 587))
 
-    Credentials and the recipient address come from environment variables
-    (see the "Email configuration" block near the top of this file) rather
-    than being hardcoded here.
-    """
-    if not (MAIL_SENDER_EMAIL and MAIL_SENDER_PASSWORD and MAIL_RECIPIENT_EMAIL):
-        flash(
-            'Email is not configured. Set MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD '
-            'and MAIL_RECIPIENT_EMAIL as environment variables before using this feature.',
-            'error'
-        )
-        return redirect(url_for('report_leave'))
+    if not sender_email or not sender_password or not recipient_email:
+        flash('Email settings are missing in environment variables.', 'error')
+        return redirect(url_for('report_attendance'))
 
-    # Everything below is wrapped in one try/except so ANY failure here
-    # (a bad DB query, a bad attachment build, or the SMTP call itself)
-    # ends in a flash + redirect instead of an unhandled 500 error page.
-    # The full traceback still gets printed to the server logs (visible
-    # in Render's "Logs" tab) so the real cause is easy to find.
+    subject = "Attendance Report"
+    body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+
+    msg = MIMEMultipart()
+    msg['From'] = sender_email
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
     try:
-        # Build the same attendance report the download button produces.
-        headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-        xlsx_buffer = build_xlsx_buffer(headers, data)
-
-        subject = "Attendance Report"
-        body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
-
-        msg = MIMEMultipart()
-        msg['From'] = MAIL_SENDER_EMAIL
-        msg['To'] = MAIL_RECIPIENT_EMAIL
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-
-        attachment = MIMEBase('application', 'octet-stream')
-        attachment.set_payload(xlsx_buffer.read())
-        encoders.encode_base64(attachment)
-        attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-        msg.attach(attachment)
-
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server = smtplib.SMTP(smtp_host, smtp_port)
         server.starttls()
-        server.login(MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD)
-        server.sendmail(MAIL_SENDER_EMAIL, MAIL_RECIPIENT_EMAIL, msg.as_string())
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
         server.quit()
-
-        flash('Attendance report sent to your email successfully!', 'success')
+        flash('Attendance report sent successfully!', 'success')
     except Exception as e:
-        # Print the full traceback to server logs (stdout -> visible in
-        # Render's Logs tab) so the real cause is diagnosable, while the
-        # user just sees a short, non-technical flash message.
-        app.logger.error("send_attendance_email failed: %s", e)
-        traceback.print_exc()
-        flash(f'Failed to send email: {e}', 'error')
+        flash(f'Failed to send email: {str(e)}', 'error')
 
-    return redirect(url_for('report_leave'))
+    return redirect(url_for('report_attendance'))
+
+#old code
+# @app.route('/send-attendance-email', methods=['POST'])
+# @login_required
+# def send_attendance_email():
+#     """Email the current attendance report (as an .xlsx attachment) to the
+#     configured recipient.
+
+#     Credentials and the recipient address come from environment variables
+#     (see the "Email configuration" block near the top of this file) rather
+#     than being hardcoded here.
+#     """
+#     if not (MAIL_SENDER_EMAIL and MAIL_SENDER_PASSWORD and MAIL_RECIPIENT_EMAIL):
+#         flash(
+#             'Email is not configured. Set MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD '
+#             'and MAIL_RECIPIENT_EMAIL as environment variables before using this feature.',
+#             'error'
+#         )
+#         return redirect(url_for('report_leave'))
+
+#     # Everything below is wrapped in one try/except so ANY failure here
+#     # (a bad DB query, a bad attachment build, or the SMTP call itself)
+#     # ends in a flash + redirect instead of an unhandled 500 error page.
+#     # The full traceback still gets printed to the server logs (visible
+#     # in Render's "Logs" tab) so the real cause is easy to find.
+#     try:
+#         # Build the same attendance report the download button produces.
+#         headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
+#         xlsx_buffer = build_xlsx_buffer(headers, data)
+
+#         subject = "Attendance Report"
+#         body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+
+#         msg = MIMEMultipart()
+#         msg['From'] = MAIL_SENDER_EMAIL
+#         msg['To'] = MAIL_RECIPIENT_EMAIL
+#         msg['Subject'] = subject
+#         msg.attach(MIMEText(body, 'plain'))
+
+#         attachment = MIMEBase('application', 'octet-stream')
+#         attachment.set_payload(xlsx_buffer.read())
+#         encoders.encode_base64(attachment)
+#         attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+#         msg.attach(attachment)
+
+#         server = smtplib.SMTP('smtp.gmail.com', 587)
+#         server.starttls()
+#         server.login(MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD)
+#         server.sendmail(MAIL_SENDER_EMAIL, MAIL_RECIPIENT_EMAIL, msg.as_string())
+#         server.quit()
+
+#         flash('Attendance report sent to your email successfully!', 'success')
+#     except Exception as e:
+#         # Print the full traceback to server logs (stdout -> visible in
+#         # Render's Logs tab) so the real cause is diagnosable, while the
+#         # user just sees a short, non-technical flash message.
+#         app.logger.error("send_attendance_email failed: %s", e)
+#         traceback.print_exc()
+#         flash(f'Failed to send email: {e}', 'error')
+
+#     return redirect(url_for('report_leave'))
 
 
 if __name__ == '__main__':
