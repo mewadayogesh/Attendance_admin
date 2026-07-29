@@ -17,6 +17,10 @@ from flask import (
 from openpyxl import Workbook
 import db
 
+MAIL_SENDER_EMAIL=digitalcrest781@gmail.com
+MAIL_SENDER_PASSWORD=your-16-char-app-password
+MAIL_RECIPIENT_EMAIL=ymewada6262@gmail.com
+
 app = Flask(__name__, static_folder='static', instance_relative_config=True)
 
 # NOTE: pull the secret key from the environment in production. Falling back
