@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% block title %}Missed Attendance Request{% endblock %}
+{% set active_page = 'missed_attendance' %}
+
+{% block extra_style %}
+<style>
+    .request-dashboard {
+        max-width: 750px;
+        margin: 0 auto;
+        padding: 35px 20px;
+        box-sizing: border-box;
+    }
+
+    .emerald-panel {
+        background: #ffffff;
+        border: 1px solid #ccfbf1;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px -5px rgba(20, 184, 166, 0.06);
+    }
+
+    .panel-header {
+        margin-bottom: 25px;
+        border-bottom: 2px solid #f0fdfa;
+        padding-bottom: 20px;
+    }
+
+    .panel-header h2 {
+        font-size: 22px;
+        font-weight: 800;
+        color: #000000;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+
+    .request-form {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+        border: 1px solid #99f6e4;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: inset 0 2px 4px rgba(20, 184, 166, 0.04);
+    }
+
+    .request-form .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .request-form label {
+        font-size: 11px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .request-form input {
+        padding: 12px 16px;
+        border: 2px solid #5eead4;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        background: #ffffff;
+        box-sizing: border-box;
+        width: 100%;
+        color: #000000;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .request-form input:focus {
+        border-color: #0d9488;
+        box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15);
+        background: #ffffff;
+    }
+
+    .btn-submit-request {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        transition: all 0.2s ease;
+        height: 48px;
+        align-self: flex-start;
+    }
+
+    .btn-submit-request:hover {
+        background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+        box-shadow: 0 6px 15px rgba(20, 184, 166, 0.4);
+        transform: translateY(-1px);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="request-dashboard">
+    <div class="emerald-panel">
+        <div class="panel-header">
+            <h2>User Request for Missed Attendance</h2>
+        </div>
+
+        <form method="POST" action="{{ url_for('submit_missed_attendance') }}" class="request-form">
+            <div class="field">
+                <label>Employee ID</label>
+                <input type="text" name="employee_id" placeholder="Enter an Employee ID" required>
+            </div>
+
+            <div class="field">
+                <label>Date</label>
+                <input type="date" name="attendance_date" required>
+            </div>
+
+            <button type="submit" class="btn-submit-request">Submit Request</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

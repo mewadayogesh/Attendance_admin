@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}New Entry{% endblock %}
+{% set active_page = 'new_entry' %}
+
+{% block content %}
+<style>
+    .center-wrapper {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: calc(100vh - 100px);
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    .form-panel {
+        width: 100%;
+        max-width: 520px;
+        background: #ffffff;
+        padding: 35px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(99, 102, 241, 0.15);
+        border: 3px solid #6366f1;
+        
+        /*shifting upper side*/
+        margin-top:-2%;
+    }
+
+    .form-panel h2 {
+        margin-bottom: 25px;
+        font-size: 24px;
+        //color: #4f46e5;
+        color: black;
+        text-align: center;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+
+    .input-group {
+        margin-bottom: 18px;
+        
+    }
+
+    .input-group label {
+        display: block;
+        //font-size: 13px;
+        
+        font-size:16px;
+        
+        font-weight: 600;
+        //color: #4b5563;
+        margin-bottom: 6px;
+        //text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color:black;
+    }
+
+    .input-group input {
+        width: 100%;
+        padding: 11px 14px;
+        font-size: 14px;
+        border: 2px solid #e0e7ff;
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        background-color: #faf8ff;
+        transition: all 0.3s ease;
+
+    }
+
+    .input-group input:focus {
+        border-color: #6366f1;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+    }
+
+    .input-group input.error-input {
+        border-color: #ef4444;
+        background-color: #fff5f5;
+    }
+
+    .field-error-text {
+        color: #ef4444;
+        font-size: 12px;
+        margin-top: 5px;
+        font-weight: 500;
+        display: block;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+    }
+
+    .button-group button, .button-group a {
+        flex: 1;
+        padding: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        text-align: center;
+        text-decoration: none;
+        transition: transform 0.1s ease, background-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .button-group button:active {
+        transform: scale(0.98);
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .btn-save:hover {
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    }
+
+    .btn-cancel {
+        background-color: #f3f4f6;
+        color: #4b5563;
+        border: 2px solid #e5e7eb !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .btn-cancel:hover {
+        background-color: #e5e7eb;
+        color: #1f2937;
+    }
+</style>
+
+<div class="center-wrapper">
+    <div class="form-panel">
+        <h2>New Entry Form</h2>
+        <form method="POST" action="{{ url_for('new_entry') }}">
+            <div class="input-group">
+                <label>Name</label>
+                <input type="text" name="name" value="{{ name|default('') }}" placeholder="Enter a name" required>
+            </div>
+
+            <div class="input-group">
+                <label>Employee ID</label>
+                <input type="text" name="employee_id" value="{{ employee_id|default('') }}" placeholder="Enter employee ID" 
+                       class="{% if error_message and 'Employee ID' in error_message %}error-input{% endif %}" required>
+                {% if error_message and 'Employee ID' in error_message %}
+                    <span class="field-error-text">{{ error_message }}</span>
+                {% endif %}
+            </div>
+
+            <div class="input-group">
+                <label>Designation</label>
+                <input type="text" name="designation" value="{{ designation|default('') }}" placeholder="Enter designation" required>
+            </div>
+
+            <div class="input-group">
+                <label>DOB</label>
+                <input type="date" name="dob" min="1950-01-01" max="2026-12-31" value="{{ dob|default('') }}" required>
+            </div>
+
+            <div class="input-group">
+                <label>Date of Joining</label>
+                <input type="date" name="date_of_joining" min="1950-01-01" max="2026-12-31" value="{{ date_of_joining|default('') }}" required>
+            </div>
+
+            {% if error_message and 'Employee ID' not in error_message %}
+                <div style="color: #ef4444; font-size: 13px; margin-top: 10px; font-weight: 500; text-align: center;">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+
+            <div class="button-group">
+                <button type="submit" class="btn-save">Save Record</button>
+                <a href="{{ url_for('new_entry') }}" class="btn-cancel">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

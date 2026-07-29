@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Edit User{% endblock %}
+{% set active_page = 'report_users' %}
+
+<!--style-->
+{% block extra_style%}
+.form-panel{
+    margin-left:30%;
+    border:3px solid #2e81ee;
+}
+.h1{
+    text-align:center;
+    font-size:26px;
+}
+{% endblock%}
+
+{% block content %}
+<div class="form-panel">
+    <h2 class="h1">Edit User</h2>
+    <form method="POST">
+        <div class="input-group">
+            <label>Username</label>
+            <input type="text" name="username" value="{{ user['username'] }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Password</label>
+            <input type="text" name="password" value="{{ user['password'] }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Role</label>
+            <select name="role" style="width: 100%; padding: 11px 14px; font-size: 14px; border: 2px solid #0e409c; border-radius: 4px; outline: none; background: white;">
+                <option value="admin" {% if user['role'] == 'admin' %}selected{% endif %}>Admin</option>
+                <option value="editor" {% if user['role'] == 'editor' %}selected{% endif %}>Editor</option>
+                <option value="user" {% if user['role'] == 'user' %}selected{% endif %}>User</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>Link to Employee (for attendance)</label>
+            <select name="linked_employee_id" style="width: 100%; padding: 11px 14px; font-size: 14px; border: 2px solid #0e409c; border-radius: 4px; outline: none; background: white;">
+                <option value="">— Not linked —</option>
+                {% for e in employees %}
+                <option value="{{ e['id'] }}" {{ 'selected' if user['linked_employee_id'] == e['id'] }}>{{ e['name'] }} ({{ e['employee_id'] }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-save">Update User</button>
+            <a href="{{ url_for('report_users') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

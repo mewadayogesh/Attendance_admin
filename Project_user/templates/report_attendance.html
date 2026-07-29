@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Report{% endblock %}
+{% set active_page = 'report' %}
+
+{% block extra_style %}
+<style>
+    .row-actions {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    .row-actions form { margin: 0; display: inline-block; }
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        height: 32px;
+        box-sizing: border-box;
+        color: white;
+    }
+    .btn-edit { background-color: #2563eb; }
+    .btn-edit:hover { background-color: #1d4ed8; }
+    .btn-delete { background-color: #e74c3c; }
+    .btn-delete:hover { background-color: #c0392b; }
+
+    /* Enhanced Filter & Search Bar Styling */
+    .filter-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px 20px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+    }
+    
+    .filter-bar label {
+        font-size: 13px;
+        font-weight: 700;
+        color: #334155;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .filter-bar select,
+    .filter-bar input[type="text"] {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 2px solid #cbd5e1;
+        font-size: 14px;
+        font-weight: 500;
+        color: #1e293b;
+        background-color: #ffffff;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .filter-bar select {
+        cursor: pointer;
+        min-width: 200px;
+    }
+
+    .filter-bar input[type="text"] {
+        min-width: 180px;
+    }
+
+    .filter-bar select:focus,
+    .filter-bar input[type="text"]:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    .btn-filter-search {
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        height: 44px;
+    }
+
+    .btn-filter-search:hover {
+        background-color: #1d4ed8;
+    }
+
+    .filter-clear {
+        display: inline-flex;
+        align-items: center;
+        padding: 10px 14px;
+        background-color: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #1d4ed8;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        height: 44px;
+        box-sizing: border-box;
+    }
+
+    .filter-clear:hover {
+        background-color: #dbeafe;
+        border-color: #93c5fd;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 15px;">
+  <a href="{{ url_for('report') }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; background-color: #ffffff; text-decoration: none; font-family: sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <span><b>&larr;</b></span> Back to Reports
+  </a>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <h2>Attendance Report{% if viewing_employee_name %} — {{ viewing_employee_name }}{% endif %}</h2>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            {% if user_role in ('admin', 'editor') %}
+            <a class="btn" style="background:#4f46e5;" href="{{ url_for('add_attendance') }}">+ Add Missed Entry</a>
+            {% endif %}
+            <a class="btn btn-download"
+               href="{{ url_for('download_attendance_xlsx', employee_id=filter_employee_id, search_emp_id=search_emp_id) }}">
+                Download Excel{% if viewing_employee_name %} ({{ viewing_employee_name }}){% endif %}
+            </a>
+        </div>
+    </div>
+
+    {% if user_role in ('admin', 'editor') %}
+    <form method="GET" class="filter-bar" style="margin-bottom: 22px;">
+        <label>Filter by employee:</label>
+        <select name="employee_id" onchange="this.form.submit()">
+            <option value="">— All employees —</option>
+            {% for e in employees %}
+            <option value="{{ e['id'] }}" {{ 'selected' if e['id'] == filter_employee_id|int else '' }}>{{ e['name'] }} ({{ e['employee_id'] }})</option>
+            {% endfor %}
+        </select>
+
+        <label style="margin-left: 5px;">Search ID:</label>
+        <input type="text" name="search_emp_id" value="{{ search_emp_id|default('') }}" placeholder="Enter Employee ID...">
+        <button type="submit" class="btn-filter-search">Search</button>
+
+        {% if filter_employee_id or search_emp_id %}
+        <a href="{{ url_for('report_attendance') }}" class="filter-clear">Clear filter</a>
+        {% endif %}
+    </form>
+    {% endif %}
+
+    {% if records %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width:6%;">S.No</th>
+                <th style="width:18%;">Employee</th>
+                <th style="width:12%;">Employee ID</th>
+                <th style="width:14%;">Date</th>
+                <th style="width:12%;">Check In</th>
+                <th style="width:12%;">Check Out</th>
+                <th style="width:10%;">Status</th>
+                {% if user_role in ('admin', 'editor') %}
+                <th style="width:16%;">Actions</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in records %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ r['employee_name'] or 'Unknown' }}</td>
+                <td>{{ r['custom_emp_id'] or '' }}</td>
+                <td>
+                    {% set d_str = r['work_date'] | string %}
+                    {% if d_str | length >= 10 %}
+                        {{ d_str[8:10] }}-{{ d_str[5:7] }}-{{ d_str[:4] }}
+                    {% else %}
+                        {{ d_str }}
+                    {% endif %}
+                </td>
+                <td>{{ r['check_in'] or '—' }}</td>
+                <td>{{ r['check_out'] or '—' }}</td>
+                <td><span class="status status-{{ r['status']|lower|replace(' ', '') }}">{{ r['status'] }}</span></td>
+                {% if user_role in ('admin', 'editor') %}
+                <td class="row-actions">
+                    <a class="btn-action btn-edit" href="{{ url_for('edit_attendance', attendance_id=r['id']) }}">Edit</a>
+                    <form method="POST" action="{{ url_for('delete_attendance', attendance_id=r['id']) }}"
+                          onsubmit="return confirm('Delete this attendance record?');">
+                        <button type="submit" class="btn-action btn-delete">Delete</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-note">No attendance records found{% if filter_employee_id or search_emp_id %} {% endif %}.</p>
+    {% endif %}
+</div>
+{% endblock %}

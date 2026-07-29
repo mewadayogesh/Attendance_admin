@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Employee Report{% endblock %}
+{% set active_page = 'report' %}
+{% block content %}
+
+<div style="margin-bottom: 15px;">
+  <a href="{{ url_for('report') }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; background-color: #ffffff; text-decoration: none; font-family: sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <span>&larr;</span> Back to Reports</a>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <h2>Employee Report</h2>
+        <a class="btn btn-download" href="{{ url_for('download_employees_xlsx') }}">Download Excel</a>
+    </div>
+
+    {% if employees %}
+    <table>
+        <thead>
+            <tr>
+                <th style="width:6%;">ID</th>
+                <th style="width:16%;">Name</th>
+                <th style="width:12%;">Employee ID</th>
+                <th style="width:16%;">Designation</th>
+                <th style="width:10%;">DOB</th>
+                <th style="width:12%;">Joined</th>
+                <th style="width:14%;">Added</th>
+                {% if user_role != 'user' %}
+                <th style="width:14%;">Actions</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in employees %}
+            <tr>
+                <td>{{ e['id'] }}</td>
+                <td>{{ e['name'] }}</td>
+                <td>{{ e['employee_id'] }}</td>
+                <td>{{ e['designation'] }}</td>
+                <td>
+                    {% if e['dob'] %}
+                        {% set p = e['dob'].split('-') %}
+                        {% if p|length == 3 %}{{ p[2] }}-{{ p[1] }}-{{ p[0] }}{% else %}{{ e['dob'] }}{% endif %}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if e['date_of_joining'] %}
+                        {% set p = e['date_of_joining'].split('-') %}
+                        {% if p|length == 3 %}{{ p[2] }}-{{ p[1] }}-{{ p[0] }}{% else %}{{ e['date_of_joining'] }}{% endif %}
+                    {% endif %}
+                </td>
+                <td>{{ e['created_at'] }}</td>
+                
+                {% if user_role != 'user' %}
+                <td class="row-actions">
+                    <a class="btn btn-edit" href="{{ url_for('edit_employee', employee_id=e['id']) }}">Edit</a>
+                    <form method="POST" action="{{ url_for('delete_employee', employee_id=e['id']) }}"
+                          onsubmit="return confirm('Are you sure you want to delete this employee record?');">
+                        <button type="submit" class="btn-delete">Delete</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-note">No employee records yet. Add one from "New entry".</p>
+    {% endif %}
+</div>
+{% endblock %}

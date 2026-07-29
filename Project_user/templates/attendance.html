@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Mark Attendance{% endblock %}
+{% set active_page = 'attendance' %}
+
+{% block extra_style %}
+<style>
+    .attendance-wrapper {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0 30px 0;
+    }
+
+    .attendance-panel {
+        width: 100%;
+        max-width: 640px;
+        background: #ffffff;
+        padding: 35px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(13, 148, 136, 0.15);
+        border-top: 5px solid #0d9488;
+        box-sizing: border-box;
+    }
+
+    .attendance-panel h2 {
+        margin: 0 0 6px 0;
+        font-size: 24px;
+        color: #0f766e;
+        text-align: center;
+        font-weight: 700;
+    }
+
+    .attendance-panel .who {
+        text-align: center;
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 25px;
+    }
+
+    .punch-clock {
+        background: #f0fdfa;
+        border: 1px solid #99f6e4;
+        border-radius: 10px;
+        padding: 20px 24px;
+        justify-content: space-between;
+    }
+
+    .punch-clock .time-display { color: #0f766e; font-variant-numeric: tabular-nums; }
+
+    .punch-actions { display: flex; gap: 10px; }
+
+    .btn-punch-in, .btn-punch-out {
+        padding: 10px 20px;
+        font-size: 14px;
+        font-weight: 700;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        color: white;
+    }
+    .btn-punch-in { background: #0d9488; }
+    .btn-punch-in:hover { background: #0f766e; }
+    .btn-punch-out { background: #6b7280; }
+    .btn-punch-out:hover { background: #4b5563; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .punch-stamps { justify-content: center; }
+
+    .recent-title { margin-top: 30px; font-size: 16px; color: #333; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="attendance-wrapper">
+    <div class="attendance-panel">
+        <h2>Mark Attendance</h2>
+        <p class="who">{{ employee['name'] }} &middot; {{ employee['employee_id'] }} &middot; {{ today }}</p>
+
+        <div class="punch-clock">
+            <div class="time-display" id="liveClock">--:--:--</div>
+            <div class="punch-actions">
+                <button id="btnIn" class="btn-punch-in" {{ 'disabled' if today_row }}>Check in</button>
+                <button id="btnOut" class="btn-punch-out" {{ 'disabled' if not today_row or today_row['check_out'] }}>Check out</button>
+            </div>
+        </div>
+
+        <div class="punch-stamps">
+            <div class="punch-stamp">Check-in<strong id="stampIn">{{ today_row['check_in'] if today_row else '—' }}</strong></div>
+            <div class="punch-stamp">Check-out<strong id="stampOut">{{ today_row['check_out'] if today_row and today_row['check_out'] else '—' }}</strong></div>
+            <div class="punch-stamp">Status<strong>
+                {% if today_row and today_row['check_out'] %}
+                    <span class="status status-present">Complete</span>
+                {% elif today_row %}
+                    <span class="status status-present">Checked in</span>
+                {% else %}
+                    <span class="status status-pending">Not checked in</span>
+                {% endif %}
+            </strong></div>
+        </div>
+
+        <h3 class="recent-title">Last 10 entries</h3>
+        {% if recent %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:28%;">Date</th>
+                    <th style="width:24%;">Check In</th>
+                    <th style="width:24%;">Check Out</th>
+                    <th style="width:24%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recent %}
+                <tr>
+                    <td>{{ r['work_date'] }}</td>
+                    <td>{{ r['check_in'] or '—' }}</td>
+                    <td>{{ r['check_out'] or '—' }}</td>
+                    <td><span class="status status-{{ r['status']|lower|replace(' ', '') }}">{{ r['status'] }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-note">No attendance recorded yet — check in above to start your record.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function tickClock() {
+    document.getElementById('liveClock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+async function punch(url, btnId, stampId, otherBtnId) {
+    const btn = document.getElementById(btnId);
+    btn.disabled = true;
+    try {
+        const res = await fetch(url, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) { alert(data.error || 'Something went wrong.'); btn.disabled = false; return; }
+        document.getElementById(stampId).textContent = data.check_in || data.check_out;
+        if (otherBtnId) document.getElementById(otherBtnId).disabled = false;
+    } catch (e) {
+        alert('Network error — please try again.');
+        btn.disabled = false;
+    }
+}
+
+document.getElementById('btnIn').addEventListener('click', () =>
+    punch("{{ url_for('attendance_check_in') }}", 'btnIn', 'stampIn', 'btnOut'));
+document.getElementById('btnOut').addEventListener('click', () =>
+    punch("{{ url_for('attendance_check_out') }}", 'btnOut', 'stampOut', null));
+</script>
+{% endblock %}

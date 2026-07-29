@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}D&D Department{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            min-height: 100vh;
+            background: lightblue;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        /* ---------- Sidebar (Fixed & Non-Scrolling) ---------- */
+        .box {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 250px;
+            height: 100vh;
+            color: white;
+            background: radial-gradient(circle at top right, #7c3aed 0%, #4f46e5 50%, #2563eb 100%);
+            padding-top: 30px;
+            flex-shrink: 0;
+            border-right: 1px solid brown;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .box h2 {
+            text-align: center;
+            margin: 0 0 30px 0;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 14px 35px;    //15px 30px
+            //margin-bottom: 4px; 
+            margin-bottom: 1%; 
+
+            color: white;
+            text-decoration: none;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .nav-link:hover,
+        .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* ---------- Main content (Pushed right to clear the fixed sidebar) ---------- */
+        .main-content {
+            margin-left: 250px;
+            padding: 40px;
+            flex-grow: 1;
+            min-width: 0;   /* lets content shrink instead of overflowing the page */
+            overflow-x: auto;
+            box-sizing: border-box;
+        }
+
+        /* ---------- Flash messages ---------- */
+        #flash-container {
+            transition: opacity 0.5s ease;
+        }
+        .flash {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .flash-success { background: #e8f8ef; color: #1e7e45; border: 1px solid #c3e6cb; }
+        .flash-error   { background: #fdecea; color: #c0392b; border: 1px solid #f5c6cb; }
+
+        /* ---------- Generic form styles (new entry / leave / edit forms) ---------- */
+        .form-panel {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-panel h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #0e409c;
+            border-radius: 4px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        button, .btn {
+            padding: 10px 16px;
+            font-size: 15px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-save, .btn-approve, .btn-download { background-color: #27ae60; }
+        .btn-cancel, .btn-reject, .btn-delete { background-color: #e74c3c; }
+        .btn-edit { background-color: #2563eb; }
+        .btn-secondary { background-color: #6b7280; }
+
+        button:hover, .btn:hover { opacity: 0.9; }
+
+        /* ---------- Panels / tables (reports & search) ---------- */
+        .panel {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .panel-header h2 { margin: 0; color: #333; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            
+        }
+
+        thead tr {
+            border-bottom: 2px solid #2563eb;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 8px 10px;
+            font-size: 14px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            vertical-align: top;
+        }
+
+        tbody tr { border-bottom: 1px solid #eee; }
+
+        .row-actions { white-space: nowrap; }
+        .row-actions form { display: inline; }
+        .row-actions button, .row-actions a {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin-right: 4px;
+        }
+
+        .status {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status-pending  { background: #fff3cd; color: #8a6d00; }
+        .status-approved { background: #d4edda; color: #1e7e45; }
+        .status-rejected { background: #f8d7da; color: #a12a2a; }
+        .status-present   { background: #d4edda; color: #1e7e45; }
+        .status-halfday, .status-half.day  { background: #fff3cd; color: #8a6d00; }
+        .status-leave     { background: #ede9fe; color: #5b21b6; }
+        .status-absent    { background: #f8d7da; color: #a12a2a; }
+        .status-holiday   { background: #fce7f3; color: #be185d; }
+
+        .empty-note { color: #777; font-size: 14px; }
+
+        .report-links {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .report-card {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+            color: #333;
+            min-width: 220px;
+        }
+        .report-card h3 { margin: 0 0 8px 0; color: #2563eb; }
+        .report-card p { margin: 0; font-size: 14px; color: #666; }
+
+        /* ---------- Attendance calendar ---------- */
+        .cal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .cal-nav { display: flex; align-items: center; gap: 10px; }
+        .cal-nav a {
+            text-decoration: none;
+            color: #2563eb;
+            border: 1px solid #dbeafe;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .cal-nav a:hover { background: #eff6ff; }
+        .cal-month-label { font-size: 20px; font-weight: 700; color: #1e293b; min-width: 190px; text-align: center; }
+        .cal-legend { display: flex; gap: 16px; font-size: 13px; color: #555; margin-bottom: 14px; flex-wrap: wrap; }
+        .cal-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .cal-legend .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        .dot-present { background: #1e7e45; }
+        .dot-halfday { background: #8a6d00; }
+        .dot-leave   { background: #5b21b6; }
+        .dot-absent  { background: #a12a2a; }
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .cal-weekday { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #888; text-align: center; padding-bottom: 4px; }
+        .cal-cell {
+            min-height: 76px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 6px 8px;
+            background: #fff;
+            position: relative;
+        }
+        .cal-cell.empty { background: transparent; border-color: transparent; }
+        .cal-cell .cal-day-num { font-size: 12px; color: #888; font-weight: 600; }
+        .cal-cell.is-today { border-color: #2563eb; border-width: 2px; }
+        .cal-cell.is-today .cal-day-num { color: #2563eb; }
+        .cal-cell.present { background: #ecfdf3; }
+        .cal-cell.halfday { background: #fffaeb; }
+        .cal-cell.leave   { background: #f5f3ff; }
+        .cal-cell.absent  { background: #fef2f2; }
+        .cal-cell.holiday { background: #fdf2f8; border-color: #f9a8d4; }
+        .cal-cell.weekend { background: #f8fafc; border-color: #e2e8f0; }
+        .cal-cell .cal-status-tag { position: absolute; top: 6px; right: 7px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+        .cal-cell.present .cal-status-tag { color: #1e7e45; }
+        .cal-cell.halfday .cal-status-tag { color: #8a6d00; }
+        .cal-cell.leave .cal-status-tag { color: #5b21b6; }
+        .cal-cell.absent .cal-status-tag { color: #a12a2a; }
+        .cal-cell.holiday .cal-status-tag { color: #be185d; }
+        .cal-cell.weekend .cal-status-tag { color: #64748b; }
+        .dot-holiday { background: #db2777; }
+        .dot-weekend { background: #94a3b8; }
+        .cal-cell .cal-times { font-size: 10px; color: #888; margin-top: 20px; line-height: 1.5; }
+        .cal-cell .cal-extra-tag {
+            font-size: 9px;
+            font-weight: 700;
+            color: #db2777;
+            background: #fce7f3;
+            border-radius: 4px;
+            padding: 1px 4px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        /* ---------- Punch clock ---------- */
+        .punch-clock { display: flex; align-items: center; gap: 26px; flex-wrap: wrap; }
+        .punch-clock .time-display { font-size: 32px; font-weight: 700; color: #1e293b; min-width: 150px; }
+        .punch-stamps { display: flex; gap: 26px; margin-top: 18px; }
+        .punch-stamp { font-size: 13px; color: #666; }
+        .punch-stamp strong { display: block; font-size: 17px; color: #1e293b; margin-top: 2px; }
+
+        {% block extra_style %}{% endblock %}
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h2>D&amp;D Dept</h2>
+    <a href="{{ url_for('dashboard') }}" class="nav-link {{ 'active' if active_page == 'dashboard' }}">Dashboard</a>
+    <a href="{{ url_for('attendance_home') }}" class="nav-link {{ 'active' if active_page == 'attendance' }}">Mark Attendance</a>
+    <a href="{{ url_for('attendance_calendar') }}" class="nav-link {{ 'active' if active_page == 'attendance_calendar' }}">Attendance Calendar</a>
+    
+    
+    <!--comment hide the access of user or user -->
+    {% if session.get('role') != 'user' %}
+    <a href="{{ url_for('new_entry') }}" class="nav-link {{ 'active' if active_page == 'new_entry' }}">New entry</a>
+    <a href="{{ url_for('search') }}" class="nav-link {{ 'active' if active_page == 'search' }}">Search</a>    
+    {% endif %}
+
+    <a href="{{ url_for('holidays') }}" class="nav-link {{ 'active' if active_page == 'holidays' }}">Holidays</a>    
+    <!-- <a href="{{ url_for('search') }}" class="nav-link {{ 'active' if active_page == 'search' }}">Search</a>-->
+    <a href="{{ url_for('leave') }}" class="nav-link {{ 'active' if active_page == 'leave' }}">Leave</a>
+    <a href="{{ url_for('report') }}" class="nav-link {{ 'active' if active_page == 'report' }}">Report</a>
+    
+    <!-- Add User & View Users visible only to Admins -->
+    {% if session.get('role') == 'admin' %}
+    <!--<a href="{{ url_for('add_user') }}" class="nav-link {{ 'active' if active_page == 'add_user' }}">Master add</a>-->
+     <a href="{{ url_for('add_user') }}" class="nav-link {{ 'active' if active_page == 'add_user' }}">Add User</a>
+     <a href="{{ url_for('report_users') }}" class="nav-link {{ 'active' if active_page == 'report_users' }}">View Users</a>
+   {% endif %}
+   
+   
+   <!--comment fo User Request-->
+     <a href="{{ url_for('user_request') }}" class="nav-link {{ 'active' if active_page == 'user_request' }}"> User Request</a>
+     <a href="{{ url_for('logout') }}" class="nav-link">Logout</a>
+
+</div>
+
+<div class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div id="flash-container">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
+    {% block content %}{% endblock %}
+</div>
+
+<!-- Auto-dismiss script for flash messages -->
+<script>
+    setTimeout(function() {
+        const flashContainer = document.getElementById('flash-container');
+        if (flashContainer) {
+            flashContainer.style.opacity = '0';
+            setTimeout(function() {
+                flashContainer.remove();
+            }, 500); // Wait 0.5 seconds for fade transition to complete before clearing from DOM
+        }
+    }, 3000); // Starts fading out after 2.5 seconds
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}Leave Report{% endblock %}
+{% set active_page = 'report' %}
+
+{% block content %}
+    <style>
+        /* Ensures all action buttons share identical sizing, padding, and alignment */
+        .row-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .row-actions form {
+            margin: 0;
+            display: inline-block;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1.5;
+            border-radius: 4px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-decoration: none;
+            box-sizing: border-box;
+            height: 32px; /* Fixed height for absolute uniformity */
+        }
+
+        /* Color variations while keeping dimensions identical */
+        .btn-approve { background-color: #10b981; color: white; }
+        .btn-approve:hover { background-color: #059669; }
+
+        .btn-reject { background-color: #ef4444; color: white; }
+        .btn-reject:hover { background-color: #dc2626; }
+
+        .btn-edit { background-color: #f59e0b; color: white; }
+        .btn-edit:hover { background-color: #d97706; }
+
+        .btn-delete { margin-left:22px;background-color: #6b7280; color: white; }
+        .btn-delete:hover { background-color: #4b5563; }
+    </style>
+
+    <!--
+    <div style="margin-bottom:15px;">
+        <button><a href="{{ url_for('report') }}" style="color:#2563eb;text-decoration:none;">&larr; Back to Reports</a></button>
+    </div>-->
+<div style="margin-bottom: 15px;">
+  <a href="{{ url_for('report') }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; background-color: #ffffff; text-decoration: none; font-family: sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+    <span>&larr;</span> Back to Reports</a>
+</div>
+
+
+    
+    <div class="panel">
+        <div class="panel-header">
+            <h2>Leave Report</h2>
+            <a class="btn btn-download" href="{{ url_for('download_leave_requests_xlsx') }}">Download Excel</a>
+        </div>
+
+        {% if leave_requests %}
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:5%;">S.No</th>
+                    <th style="width:10%;">Requested By</th>
+                    <th style="width:10%;">Employee ID</th>
+                    <th style="width:18%;">Dates</th>
+                    <th style="width:5%;">Days</th>
+                    <th style="width:12%;">Reason</th>
+                    <th style="width:15%;">Description</th>
+                    <th style="width:10%;">Requested On</th>
+                    <th style="width:8%;">Status</th>
+                    {% if user_role != 'user' %}
+                    <th style="width:17%;">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for lr in leave_requests|reverse %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ lr['submitted_by'] }}</td>
+                    <td>{{ lr['employee_id'] }}</td>
+                    <td>{{ lr['dates'] }}</td>
+                    <td>{{ lr['num_days'] }}</td>
+                    <td>
+                        {% if lr['reason'] %}
+                            {{ lr['reason'] }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if lr['status'] == 'Rejected' and lr['description'] %}
+                            {{ lr['description'] }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{{ lr['request_date'] }}</td>
+                    <td><span class="status status-{{ lr['status']|lower }}">{{ lr['status'] }}</span></td>
+                    
+                    {% if user_role != 'user' %}
+                    <td class="row-actions">
+                        {% if lr['status'] == 'Pending' %}
+                        <form method="POST" action="{{ url_for('update_leave_status', request_id=lr['id'], action='approve') }}">
+                            <button type="submit" class="btn-action btn-approve">Approve</button>
+                        </form>
+                        <form method="POST" action="{{ url_for('update_leave_status', request_id=lr['id'], action='reject') }}"
+                              onsubmit="
+                                  let reason = prompt('Please enter the rejection reason:');
+                                  if (!reason) return false;
+                                  let input = document.createElement('input');
+                                  input.type = 'hidden';
+                                  input.name = 'description';
+                                  input.value = reason;
+                                  this.appendChild(input);
+                              ">
+                            <button type="submit" class="btn-action btn-reject">Reject</button>
+                        </form>
+                        {% endif %}
+                        
+                        <a class="btn-action btn-edit" href="{{ url_for('edit_leave', request_id=lr['id']) }}">Edit</a>
+                        
+                        <form method="POST" action="{{ url_for('delete_leave', request_id=lr['id']) }}"
+                              onsubmit="return confirm('Are you sure you want to delete this leave record?');">
+                            <button type="submit" class="btn-action btn-delete">Delete</button>
+                        </form>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="empty-note">No leave requests yet.</p>
+        {% endif %}
+    </div>
+{% endblock %}

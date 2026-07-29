@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Missed Attendance Request{% endblock %}
+
+{% block extra_style %}
+<style>
+    body{
+
+    }
+
+    .form1 {
+        border: 2px solid #2e81ee;
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+        max-width: 500px;
+        margin-top: 0;
+        //background-color: #8eb8da;
+        background-color:white;
+        border-radius: 10px;
+        padding-bottom: 20px;
+    }
+
+    .form1 h2 {
+        //margin-left:20px;
+        text-align:center;
+        border-bottom: 2px solid grey;
+        padding: 18px;
+        margin: 0 0 20px 0;
+        color: black;
+    }
+
+    .form1 label {
+        color: black;
+        font-weight: bold;
+    }
+
+    .form1 input, .form1 textarea {
+        width: 90%;
+        padding: 8px 12px;
+        margin-top: 4px;
+        border-radius: 4px;
+        //border: 1px solid #eb9249;
+        border: 2px solid #99f6e4;
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .form1 button {
+        //background-color: #68e62e;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        //color: #000;
+        color: #fff;
+        font-weight: bold;
+        margin-top: 10px;
+        margin-bottom: 0;
+        width: 90%;
+        padding: 10px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        letter-spacing:0.5;
+    }
+
+    .form1 button:hover {
+        opacity: 0.9;
+    }
+
+    .date {
+        color: #333;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<form class="form1" method="POST">
+    <h2>User Request for Missed Attendance</h2>
+
+    
+    <div style="margin-left: 10%;">
+
+        <div style="margin-bottom: 15px;">
+            <label>Employee ID</label>
+            <input type="text" name="employee_id" value="{{ employee_id }}" readonly required>
+            </div>
+        
+        <!--comment this is old code -->
+        <!--    
+            <div style="margin-bottom: 15px;">
+            <label>Employee ID</label><br>
+            <input type="text" name="employee_id" placeholder="Enter Employee ID" required>
+        </div>-->
+
+
+        <div style="margin-bottom: 15px;">
+            <label>Missed Date</label><br>
+            <input type="date" name="missed_date" class="date" required>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+            <label>Date of Request</label><br>
+            <input type="date" name="request_date" class="date" required>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+            <label>Reason</label><br>
+            <input type="text" name="reason" placeholder="Enter Reason"   required>
+        </div>
+
+        <button type="submit">Submit Request</button>
+    </div>
+</form>
+{% endblock %}

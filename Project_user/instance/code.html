@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Edit Leave Request{% endblock %}
+{% block extra_style %}
+<style>
+    h2{
+        text-align: center;
+        background-color: hwb(180 74% 21%);
+        padding: 8px 8px;
+    }
+    form{
+        border: 1px solid brown;
+    }
+    
+    .div{
+       background-color: rgb(86, 238, 48);
+        color: black;
+        padding:8px;
+        /*width:40%;*/
+       /* text-align:center;*/
+        padding: text 10px;;
+    }
+    .div,table{
+        /*color:red;*/
+        font-size: 16px;
+        margin-left: 8px;
+        /*padding: 4px 8px;*/
+
+    }
+    
+    .table1{
+        margin-left: 40px;
+        color:red;
+    }
+
+</style>
+{% endblock %}
+<!--this for html -->
+{% block content %}
+<form >
+    <h2>User request report</h2>
+</form>
+<div class="div">
+    <th class="table">
+        <tr class="table1" >Employee ID</tr>
+        <tr class="table2" >Missed Date</tr>
+        <tr class="table3" >Date of Request</tr>
+        <tr style="color: red;">Reason</tr>
+    </th>
+    <!--<h4>date</h4>-->
+</div>    
+{% endblock %}

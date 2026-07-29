@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Edit Employee{% endblock %}
+{% set active_page = 'search' %}
+{% block extra_style%}
+
+<style>
+    /* Centers the entire content panel on the page */
+    body {
+        background-color: #f1f5f9;
+    }
+
+    .form-panel {
+        max-width: 550px;
+        margin: 40px auto;
+        background: #ffffff;
+        padding: 35px 40px;
+        border-radius: 12px;
+        //border: 1px solid #cbd5e1;
+        border: 3px solid #2e81ee;
+
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+
+        margin-top:-10px;
+    }
+
+    .form-panel h2 {
+        margin-top: 0;
+        margin-bottom: 24px;
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+        text-align: center;
+    }
+
+    /* Input Group Styling for Clear Visual Hierarchy */
+    .input-group {
+        margin-bottom: 20px;
+    }
+
+    .input-group label {
+        display: block;
+        //font-size: 13px;
+        font-size:16px;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 8px;
+        //text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .input-group input[type="text"],
+    .input-group input[type="date"] {
+        width: 100%;
+        padding: 12px 14px;
+        border: 2px solid #94a3b8;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 500;
+        color: #0f172a;
+        background-color: #ffffff;
+        outline: none;
+        transition: all 0.2s ease;
+        box-sizing: border-box;
+    }
+
+    .input-group input:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+    }
+
+    /* Button Group Styling */
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+    }
+
+    .btn-save {
+        flex: 1;
+        background-color: #2563eb;
+        color: #ffffff;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        text-align: center;
+    }
+
+    .btn-save:hover {
+        background-color: #1d4ed8;
+    }
+
+    .btn-cancel-custom {
+        flex: 1;
+        background-color: #e2e8f0;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 15px;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        text-align: center;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+
+    .btn-cancel-custom:hover {
+        background-color: #cbd5e1;
+        color: #0f172a;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="form-panel">
+    <h2>Edit Employee Record</h2>
+    <form method="POST" action="{{ url_for('edit_employee', employee_id=employee['id']) }}">
+        <div class="input-group">
+            <label>Name</label>
+            <input type="text" name="name" value="{{ employee['name'] }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Employee ID</label>
+            <input type="text" name="employee_id" value="{{ employee['employee_id'] }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Designation</label>
+            <input type="text" name="designation" value="{{ employee['designation'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>DOB</label>
+            <input type="date" name="dob" value="{{ employee['dob'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>Date of Joining</label>
+            <input type="date" name="date_of_joining" value="{{ employee['date_of_joining'] or '' }}">
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-save">Update Record</button>
+            <a href="{{ back_url }}" class="btn-cancel-custom">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

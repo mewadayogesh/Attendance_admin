@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Attendance Calendar{% endblock %}
+{% set active_page = 'attendance_calendar' %}
+
+{% block content %}
+<div class="panel-header" style="margin-bottom:15px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+        <h2>Attendance Calendar{% if viewing_name %} — {{ viewing_name }}{% endif %}</h2>
+        {% if employees %}
+        <form method="GET" style="display:flex; align-items:center; gap:8px; margin-top:8px;">
+            <select name="employee_id" onchange="this.form.submit()" style="padding:8px 12px; border-radius:6px; border:2px solid #0e409c; font-size:14px;">
+                {% for e in employees %}
+                    <option value="{{ e['id'] }}" {{ 'selected' if e['id'] == viewing_id }}>{{ e['name'] }} ({{ e['employee_id'] }})</option>
+                {% endfor %}
+            </select>
+            <input type="hidden" name="year" value="{{ year }}">
+            <input type="hidden" name="month" value="{{ month }}">
+        </form>
+        {% endif %}
+    </div>
+    <div style="display:flex; gap:10px;">
+        {% if session.get('role') in ('admin', 'editor') %}
+        <a href="{{ url_for('report_attendance', employee_id=viewing_id) }}" class="btn" style="background: #2563eb; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block;">Fix Attendance</a>
+        {% endif %}
+        <a href="{{ url_for('download_attendance_xlsx', employee_id=viewing_id) if session.get('role') in ('admin','editor') else url_for('download_attendance_xlsx') }}" class="btn" style="background: #059669; color: white; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: 600; display: inline-block;">Download Excel</a>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="cal-header">
+        <div class="cal-nav">
+            <a href="{{ url_for('attendance_calendar', year=prev_year, month=prev_month, employee_id=viewing_id) }}">&larr; Prev</a>
+        </div>
+        <div class="cal-month-label">{{ month_name }} {{ year }}</div>
+        <div class="cal-nav">
+            <a href="{{ url_for('attendance_calendar', year=next_year, month=next_month, employee_id=viewing_id) }}">Next &rarr;</a>
+        </div>
+    </div>
+
+    <div class="cal-legend">
+        <span><span class="dot dot-present"></span> Present ({{ counts['Present'] }})</span>
+        <span><span class="dot dot-halfday"></span> Half Day ({{ counts['Half Day'] }})</span>
+        <span><span class="dot dot-leave"></span> Leave ({{ counts['Leave'] }})</span>
+        <span><span class="dot dot-absent"></span> Absent ({{ counts['Absent'] }})</span>
+        <span><span class="dot dot-holiday"></span> Holiday ({{ holiday_count }})</span>
+        <span><span class="dot dot-weekend"></span> Weekend ({{ weekend_count }})</span>
+        {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('holidays') }}" style="margin-left:auto; font-size:13px; color:#db2777; font-weight:700; text-decoration:none;">+ Manage Holidays</a>
+        {% endif %}
+    </div>
+
+    {% if viewing_id %}
+    <div class="cal-grid">
+        {% for label in weekday_labels %}
+            <div class="cal-weekday">{{ label }}</div>
+        {% endfor %}
+
+        {% for week in weeks %}
+            {% for cell in week %}
+                {% if cell is none %}
+                    <div class="cal-cell empty"></div>
+                {% else %}
+                    <div class="cal-cell {{ cell.css }} {{ 'is-today' if cell.is_today }}">
+                        <div class="cal-day-num">{{ cell.day }}</div>
+                        {% if cell.status == 'Holiday' %}
+                            <div class="cal-status-tag">Holiday</div>
+                            <div class="cal-times">{{ cell.holiday_name }}</div>
+                        {% elif cell.status == 'Weekend' %}
+                            <div class="cal-status-tag">Weekend</div>
+                        {% elif cell.status %}
+                            <div class="cal-status-tag">{{ cell.status }}</div>
+                            <div class="cal-times">
+                                {% if cell.check_in %}in {{ cell.check_in[:5] }}{% endif %}
+                                {% if cell.check_out %}<br>out {{ cell.check_out[:5] }}{% endif %}
+                            </div>
+                            {% if cell.extra_tag %}
+                            <div class="cal-extra-tag">{{ cell.extra_tag }}</div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    </div>
+    <p class="empty-note" style="margin-top:14px;">Blank cells had no recorded punch — typically days before this employee's record began, or days nobody marked.</p>
+    {% else %}
+    <p class="empty-note">Your account isn't linked to an employee record yet — ask an admin to link it from Add  / Edit User.</p>
+    {% endif %}
+</div>
+{% endblock %}

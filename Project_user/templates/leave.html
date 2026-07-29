@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% block title %}Leave Application{% endblock %}
+{% set active_page = 'leave' %}
+
+{% block extra_style %}
+<style>
+    .main-content-wrapper {
+        margin-left: 260px;
+        width: calc(100% - 260px);
+        padding: 30px 20px;
+        box-sizing: border-box;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+
+    @media (max-width: 768px) {
+        .main-content-wrapper {
+            margin-left: 0;
+            width: 100%;
+            position: relative;
+        }
+    }
+
+    .form-panel {
+        width: 100%;
+        max-width: 520px;
+        background: #ffffff;
+        padding: 35px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(16, 185, 129, 0.15);
+        border-top: 5px solid #10b981;
+        box-sizing: border-box;
+        margin-left: 280px;
+        margin-top: -10px;
+    }
+
+    .form-panel h2 {
+        margin-bottom: 25px;
+        font-size: 24px;
+        //color: #059669;
+        color: black;
+
+        text-align: center;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        
+        margin-bottom:10%;
+        
+        //border: 2px  solid red;
+        //padding-bottom:6px;
+        //border-left: 4px solid #f5b08ed8;
+
+    }
+
+    .input-group {
+        margin-bottom: 18px;
+    }
+
+    .input-group label {
+        display: block;
+        //font-size: 13px;
+        font-size:14px;
+        font-weight: 600;
+        color: #4b5563;
+        margin-bottom: 6px;
+        //text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .input-group input {
+        width: 100%;
+        padding: 11px 14px;
+        font-size: 14px;
+        border: 2px solid #d1fae5;
+        border-radius: 8px;
+        box-sizing: border-box;
+        outline: none;
+        background-color: #f0fdf4;
+        transition: all 0.3s ease;
+    }
+
+    .input-group input:focus {
+        border-color: #10b981;
+        background-color: #ffffff;
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+    }
+
+    /* Style for fixed/disabled inputs */
+    .input-group input:disabled {
+        background-color: #e5e7eb;
+        border-color: #d1d5db;
+        color: #6b7280;
+        cursor: not-allowed;
+    }
+
+    /* Style for a field flagged as invalid by our manual JS check */
+    .input-group input.field-invalid {
+        border-color: #ef4444 !important;
+        background-color: #fff5f5 !important;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+    }
+
+    .field-error-text {
+        color: #ef4444;
+        font-size: 12px;
+        margin-top: 5px;
+        font-weight: 500;
+        display: block;
+    }
+
+    .date-input-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .date-input-container input {
+        padding-right: 40px;
+    }
+
+    .calendar-icon-btn {
+        position: absolute;
+        right: 12px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #059669;
+    }
+
+    .calendar-icon-btn svg {
+        width: 18px;
+        height: 18px;
+        fill: currentColor;
+    }
+
+    .success-message-box {
+        display: none;
+        background-color: #f0fdf4;
+        border: 2px solid #d1fae5;
+        color: #059669;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-align: center;
+        margin-top: 20px;
+        box-sizing: border-box;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+    }
+
+    .button-group button {
+        width: 100%;
+        padding: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        text-align: center;
+        text-decoration: none;
+        transition: transform 0.1s ease, background-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .button-group button:active {
+        transform: scale(0.98);
+    }
+
+    .btn-save {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-save:hover {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    }
+
+    .flatpickr-footer-buttons {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background: #fbfbfb;
+        border-top: 1px solid #e6e6e6;
+    }
+    .flatpickr-footer-buttons button {
+        padding: 6px 14px;
+        font-size: 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: none;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<div class="main-content-wrapper">
+    <div class="form-panel">
+        <h2>Leave Application</h2>
+
+        <form id="leaveForm" method="POST" action="{{ url_for('leave') }}" novalidate>
+            <div class="input-group">
+                <label>Select Multiple Dates</label>
+                <input type="text" id="multiple-dates" name="dates" value="{{ dates|default('') }}" placeholder="Click to select multiple dates" required>
+                <span class="field-error-text" id="dates-error" style="display:none;">Please select at least one date.</span>
+            </div>
+
+            <div class="input-group">
+                <label>Number of Days</label>
+                <input type="number" name="num_days" min="1" value="{{ num_days|default('') }}" placeholder="Enter number of days" required>
+            </div>
+
+            <div class="input-group">
+                <label>Reason</label>
+                <input type="text" name="reason" value="{{ reason|default('') }}" placeholder="Enter a reason" required>
+            </div>
+
+            <div class="input-group">
+                <label>Employee ID</label>
+                {# Checks various common session keys for the ID, falling back to employee_id variable if passed from routes #}
+                {% set current_emp_id = employee_id|default(session.get('employee_id', session.get('user_id', session.get('id', '')))) %}
+                <input type="text" value="{{ current_emp_id }}" disabled>
+                <input type="hidden" name="employee_id" value="{{ current_emp_id }}">
+            </div>
+
+            <div class="input-group">
+                <label>Date of Request</label>
+                <div class="date-input-container">
+                    <input type="text" id="request-date" name="request_date" value="{{ request_date|default('') }}" placeholder="dd-mm-yyyy" required>
+                    <button type="button" class="calendar-icon-btn" id="request-date-icon" title="Select date">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z"/>
+                        </svg>
+                    </button>
+                </div>
+                <span class="field-error-text" id="request-date-error" style="display:none;">This date is required — please select it.</span>
+            </div>
+
+            {% if error_message %}
+                <div style="color: #ef4444; font-size: 13px; margin-top: 10px; font-weight: 500; text-align: center;">
+                    {{ error_message }}
+                </div>
+            {% endif %}
+
+            <div class="button-group">
+                <button type="submit" class="btn-save">Apply Leave</button>
+            </div>
+
+            <div id="successMessageBox" class="success-message-box">
+                Leave request submitted successfully. Redirecting to reports...
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+    // NOTE: flatpickr makes its input readonly by default, and per the HTML
+    // spec a readonly field is excluded from native "required" constraint
+    // validation. That is exactly why the form used to submit successfully
+    // even with the date left blank. Fix: allowInput:true keeps the field
+    // in the validation pool, AND we still double-check manually below so
+    // the required rule holds regardless of browser quirks.
+
+    const fpMultiple = flatpickr("#multiple-dates", {
+        mode: "multiple",
+        dateFormat: "d-m-Y",
+        conjunction: ", ",
+        allowInput: true,
+        onReady: function(selectedDates, dateStr, instance) {
+            const footer = document.createElement("div");
+            footer.className = "flatpickr-footer-buttons";
+
+            const clearBtn = document.createElement("button");
+            clearBtn.type = "button";
+            clearBtn.style.backgroundColor = "#f3f4f6";
+            clearBtn.style.color = "#4b5563";
+            clearBtn.innerText = "Clear";
+            clearBtn.addEventListener("click", function() {
+                instance.clear();
+            });
+
+            const okBtn = document.createElement("button");
+            okBtn.type = "button";
+            okBtn.style.backgroundColor = "#10b981";
+            okBtn.style.color = "white";
+            okBtn.innerText = "OK";
+            okBtn.addEventListener("click", function() {
+                instance.close();
+            });
+
+            footer.appendChild(clearBtn);
+            footer.appendChild(okBtn);
+            instance.calendarContainer.appendChild(footer);
+        }
+    });
+
+    const fpRequest = flatpickr("#request-date", {
+        dateFormat: "d-m-Y",
+        allowInput: true,
+        // Pre-fill with today's date so the field is never left blank —
+        // the user can still click the icon and change it if needed.
+        defaultDate: document.getElementById("request-date").value || new Date(),
+    });
+
+    // Make sure the pre-filled default actually lands in the visible input
+    // right away (defaultDate alone can be a beat late on some browsers).
+    if (!document.getElementById("request-date").value) {
+        fpRequest.setDate(new Date(), true, "d-m-Y");
+    }
+
+    document.getElementById("request-date-icon").addEventListener("click", function() {
+        fpRequest.open();
+    });
+
+    function showFieldError(inputEl, errorEl, show) {
+        errorEl.style.display = show ? "block" : "none";
+        inputEl.classList.toggle("field-invalid", show);
+    }
+
+    document.getElementById("leaveForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+
+        const datesInput = document.getElementById("multiple-dates");
+        const requestDateInput = document.getElementById("request-date");
+        const datesError = document.getElementById("dates-error");
+        const requestDateError = document.getElementById("request-date-error");
+
+        let valid = true;
+
+        // Manual required checks — these do NOT depend on the browser's
+        // native validation, so they can't be bypassed by the readonly
+        // quirk described above.
+        if (!datesInput.value.trim()) {
+            showFieldError(datesInput, datesError, true);
+            valid = false;
+        } else {
+            showFieldError(datesInput, datesError, false);
+        }
+
+        if (!requestDateInput.value.trim()) {
+            showFieldError(requestDateInput, requestDateError, true);
+            valid = false;
+        } else {
+            showFieldError(requestDateInput, requestDateError, false);
+        }
+
+        // Everything else (number, reason) still uses native validation.
+        const otherFieldsValid = this.checkValidity();
+
+        if (!valid || !otherFieldsValid) {
+            if (!otherFieldsValid) {
+                this.reportValidity();
+            }
+            return;
+        }
+
+        const msgBox = document.getElementById("successMessageBox");
+        msgBox.style.display = "block";
+
+        setTimeout(() => {
+            this.submit();
+        }, 1500);
+    });
+</script>
+{% endblock %}

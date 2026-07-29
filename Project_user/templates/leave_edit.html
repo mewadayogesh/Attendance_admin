@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Edit Leave Request{% endblock %}
+{% set active_page = 'report' %}
+
+
+<!--style of css  -->
+{% block extra_style%}
+    .form-panel{   
+                margin-left:30%;
+                margin-top:-3%;
+                //text-align:center;
+                //border: 2px solid rgb(10, 8, 10);
+                border: 3px solid #4f46e5
+        }   
+    .h1{
+                margin-left:20%;
+                //margin-top:-10px;
+                //margin-bottom:30px;
+        }
+    .button-group{
+                //padding:2px 16px;
+                //border-padding:4px;
+                margin-left:10%;
+        }
+    .input-group{
+                margin-top:-8px;
+                font-size:16px; 
+                //font-size:13px;
+        }
+{% endblock%}
+
+<!--this content for the html code-->
+{% block content %}
+<div class="form-panel">
+    <h2 class="h1">Edit Leave Request #{{ leave_request['id'] }}</h2>
+    
+    <!--this POST for the python backend data can access or api configure -->
+    <form method="POST" action="{{ url_for('edit_leave', request_id=leave_request['id']) }}">
+        <div class="input-group">
+            <label>Employee ID</label>
+            <input type="text" name="employee_id" value="{{ leave_request['employee_id'] or '' }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Dates</label>
+            <input type="text" name="dates" value="{{ leave_request['dates'] or '' }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Number of Days</label>
+            <input type="number" name="num_days" value="{{ leave_request['num_days'] or '' }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Reason</label>
+            <input type="text" name="reason" value="{{ leave_request['reason'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>Description</label>
+            <input type="text" name="description" value="{{ leave_request['description'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>Date of Request</label>
+            <input type="text" name="request_date" value="{{ leave_request['request_date'] or '' }}" placeholder="dd-mm-yyyy" required>
+        </div>
+
+        <div class="input-group">
+            <label>Status</label>
+            <select name="status" style="width:100%;padding:10px;border:2px solid #0e409c;border-radius:4px;font-size:15px;">
+                {% for s in ['Pending', 'Approved', 'Rejected'] %}
+                <option value="{{ s }}" {{ 'selected' if leave_request['status'] == s }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-save">Update Record</button>
+            <a href="{{ url_for('report_leave') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

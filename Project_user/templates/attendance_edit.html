@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Edit Attendance{% endblock %}
+{% set active_page = 'report' %}
+
+{% block content %}
+<div class="form-panel">
+    <h2>Edit Attendance Record</h2>
+    <p style="margin-top:-10px; color:#6b7280; font-size:14px;">
+        {{ employee['name'] if employee else 'Unknown employee' }}
+        {% if employee %}&middot; {{ employee['employee_id'] }}{% endif %}
+    </p>
+
+    <form method="POST" action="{{ url_for('edit_attendance', attendance_id=record['id']) }}">
+        <div class="input-group">
+            <label>Date</label>
+            <input type="date" name="work_date" value="{{ record['work_date'] }}" required>
+        </div>
+
+        <div class="input-group">
+            <label>Check In</label>
+            <input type="time" name="check_in" step="1" value="{{ record['check_in'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>Check Out</label>
+            <input type="time" name="check_out" step="1" value="{{ record['check_out'] or '' }}">
+        </div>
+
+        <div class="input-group">
+            <label>Status</label>
+            <select name="status" style="width:100%;padding:10px;border:2px solid #0e409c;border-radius:4px;font-size:15px;">
+                {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if record['status'] == s }}>{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-save">Update Record</button>
+            <a href="{{ url_for('report_attendance') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

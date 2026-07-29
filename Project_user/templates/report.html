@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Reports Overview{% endblock %}
+{% set active_page = 'report' %}
+
+{% block extra_style %}
+<style>
+    .reports-container {
+        max-width: 1050px;
+        margin: 0 auto;
+        padding: 40px 20px;
+        box-sizing: border-box;
+        font-family: inherit;
+    }
+
+    /* Modern Gradient Header Banner */
+    .reports-header {
+        //background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+        background: linear-gradient(135deg, #4f46e5 0%, #3730a3 1000%);
+        color: white;
+        //padding: 30px;
+        padding:10px 10px;
+        border-radius: 16px;
+        text-align: center;
+        font-size: 28px;
+        font-weight: 700;       //800
+        letter-spacing: 0.5px;
+        margin-bottom: 40px;        //35px
+        box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
+
+    }
+
+
+    
+
+    /* Grid Layout for Report Cards */
+    .report-links {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 24px;
+    }
+
+    /* Individual Report Card Design */
+    .report-card {
+        background: #ffffff;
+        padding: 28px;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #e5e7eb;
+        border-top: 5px solid #4f46e5;
+        text-decoration: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-sizing: border-box;
+    }
+
+    .report-card::after {
+        content: "→";
+        position: absolute;
+        bottom: 20px;
+        right: 24px;
+        font-size: 18px;
+        color: #9ca3af;
+        transition: transform 0.3s ease, color 0.3s ease;
+    }
+
+    .report-card:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.15), 0 10px 10px -5px rgba(79, 70, 229, 0.04);
+        border-color: #818cf8;
+    }
+
+    .report-card:hover::after {
+        transform: translateX(4px);
+        color: #4f46e5;
+    }
+
+    .report-card h3 {
+        font-size: 20px;
+        color: #1f2937;
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+
+    .report-card p {
+        font-size: 14px;
+        color: #4b5563;
+        line-height: 1.5;
+        margin: 0;
+        padding-right: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="reports-container">
+    <div class="reports-header">Reports Overview</div>
+    
+    <div class="report-links">
+        <a class="report-card" href="{{ url_for('report_employees') }}">
+            <div>
+                <h3>Employee Report</h3>
+                <!-- <p>{{ employee_count }} record{{ 's' if employee_count != 1 else '' }} &middot; view, edit, delete, or download as Excel</p>-->
+            </div>
+        </a>
+        
+        <a class="report-card" href="{{ url_for('report_leave') }}">
+            <div>
+                <h3>Leave Report</h3>
+                <!-- <p>{{ leave_count }} request{{ 's' if leave_count != 1 else '' }} &middot; approve, reject, edit, delete, or download as Excel</p>-->
+            </div>
+        </a>
+        
+        <a class="report-card" href="{{ url_for('report_attendance') }}">
+            <div>
+                <h3>Attendance Report</h3>
+                <!--<p>Filter by employee, fix a missed check-in/out, or download as Excel</p>-->
+            </div>
+        </a>
+
+    <!--comment : attendance_calendar report-->
+        <!-- 
+        <a class="report-card" href="{{ url_for('attendance_calendar') }}">
+            <div>
+                <h3>Attendance Calendar</h3>
+                <p>Monthly view of check-ins &amp; check-outs, per employee</p>
+            </div>
+        </a>
+        -->
+
+        <a class="report-card" href="{{ url_for('holidays') }}">
+            <div>
+                <h3>Holiday Report</h3>
+                <!-- <p>Company holidays shown on every employee's calendar {{ '· admin can add or remove' if session.get('role') == 'admin' }}</p>-->
+            </div>
+        </a>
+    </div>
+</div>
+
+<form action="{{ url_for('send_attendance_email') }}" method="POST" style="margin-top: 20px;">
+    <button type="submit" style="background-color: #2563eb; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+        📧 Send Report to My Email
+    </button>
+</form>
+
+{% endblock %}

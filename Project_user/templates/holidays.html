@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% block title %}Holidays{% endblock %}
+{% set active_page = 'holidays' %}
+
+{% block extra_style %}
+<style>
+    .holiday-dashboard {    
+        max-width: 950px;
+        margin: 0 auto;
+        padding: 35px 20px;
+        box-sizing: border-box;
+    }
+
+    .back-nav {
+        margin-bottom: 20px;
+    }
+
+    /* Updated button style matching the reference image exactly */
+    .back-nav a {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        color: #1f2937;
+        background: #ffffff;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+    }
+
+    .back-nav a:hover {
+        background: #f9fafb;
+        border-color: #9ca3af;
+        color: #111827;
+    }
+
+    /* Vibrant Modern Emerald & Teal Theme */
+    .emerald-panel {
+        background: #ffffff;
+        border: 1px solid #ccfbf1;
+        border-radius: 16px;
+        padding: 30px;
+        box-shadow: 0 10px 30px -5px rgba(20, 184, 166, 0.06);
+    }
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        border-bottom: 2px solid #f0fdfa;
+        padding-bottom: 20px;
+    }
+
+    .panel-header h2 {
+        font-size: 22px;
+        font-weight: 800;
+        color: #000000;
+        margin: 0;
+        letter-spacing: -0.02em;
+    }
+
+    .btn-emerald-view {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 13px;
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.25);
+        transition: all 0.2s ease;
+    }
+
+    .btn-emerald-view:hover {
+        background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+        box-shadow: 0 6px 15px rgba(20, 184, 166, 0.35);
+        transform: translateY(-1px);
+    }
+
+    /* Structured Sleek Form Design */
+    .holiday-form {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr auto;
+        gap: 20px;
+        align-items: flex-end;
+        background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+        border: 1px solid #99f6e4;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 30px;
+        box-shadow: inset 0 2px 4px rgba(20, 184, 166, 0.04);
+    }
+
+    @media (max-width: 768px) {
+        .holiday-form {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .holiday-form .field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .holiday-form label {
+        font-size: 14px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .holiday-form input {
+        padding: 12px 16px;
+        border: 2px solid #5eead4;
+        border-radius: 8px;
+        font-size: 14px;
+        outline: none;
+        background: #ffffff;
+        box-sizing: border-box;
+        width: 100%;
+        color: #000000;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .holiday-form input:focus {
+        border-color: #0d9488;
+        box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15);
+        background: #ffffff;
+    }
+
+    .btn-holiday-add {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        transition: all 0.2s ease;
+        height: 48px;
+    }
+
+    .btn-holiday-add:hover {
+        background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+        box-shadow: 0 6px 15px rgba(20, 184, 166, 0.4);
+        transform: translateY(-1px);
+    }
+
+    /* Clean Styled Table Layout */
+    .emerald-table-wrapper {
+        border: 1px solid #ccfbf1;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+    }
+
+    th {
+        background: #f0fdfa;
+        padding: 14px 20px;
+        font-size: 11px;
+        font-weight: 700;
+        color: #000000;
+        text-transform: uppercase;
+        border-bottom: 2px solid #ccfbf1;
+        letter-spacing: 0.05em;
+    }
+
+    td {
+        padding: 16px 20px;
+        font-size: 14px;
+        color: #000000;
+        border-bottom: 1px solid #f0fdfa;
+        vertical-align: middle;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    tr:hover td {
+        background-color: #f8fafc;
+    }
+
+    .status {
+        font-weight: 600;
+    }
+
+    .status-holiday {
+        color: #000000;
+        background: #ccfbf1;
+        padding: 6px 14px;
+        border-radius: 20px;
+        display: inline-block;
+        border: 1px solid #99f6e4;
+        box-shadow: 0 1px 2px rgba(15, 118, 110, 0.05);
+    }
+
+    .row-actions form {
+        display: inline-block;
+        margin: 0;
+    }
+
+    .btn-delete {
+        background: #fff1f2;
+        color: #e11d48;
+        border: 1px solid #fda4af;
+        padding: 7px 14px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-delete:hover {
+        background: #ffe4e6;
+        border-color: #f43f5e;
+        transform: translateY(-1px);
+    }
+
+    .empty-note {
+        text-align: center;
+        padding: 45px;
+        color: #000000;
+        font-size: 14px;
+        margin: 0;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="holiday-dashboard">
+
+    <div class="back-nav">
+        <a href="{{ url_for('report') }}">
+            <span>&larr;</span> Back to Reports
+        </a>
+    </div>
+
+    <div class="emerald-panel">
+        <div class="panel-header">
+            <h2>Company Holidays</h2>
+            <a class="btn-emerald-view" href="{{ url_for('attendance_calendar') }}">View on Calendar</a>
+        </div>
+
+        {% if user_role == 'admin' %}
+        <form method="POST" action="{{ url_for('add_holiday') }}" class="holiday-form">
+            <div class="field">
+                <label>Holiday Name</label>
+                <input type="text" name="name" placeholder="Enter a holiday name" required>
+            </div>
+
+            <div class="field">
+                <label>Date</label>
+                <input type="date" name="holiday_date" required>
+            </div>
+
+            <button type="submit" class="btn btn-holiday-add">+ Add Holiday</button>
+        </form>
+        {% endif %}
+
+        <div class="emerald-table-wrapper">
+            {% if holidays %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:15%;">S.No</th>
+                        <th style="width:35%;">Date</th>
+                        <th style="width:35%;">Holiday Name</th>
+                        {% if user_role == 'admin' %}
+                        <th style="width:15%; text-align: left;">Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in holidays %}
+                    <tr>
+                        <td style="color: #000000; font-weight: 700;">{{ loop.index }}</td>
+                        <td style="font-weight: 600; color: #000000;">
+                            {% set d_str = h['holiday_date'] | string %}
+                            {% if d_str | length >= 10 %}
+                                {{ d_str[8:10] }}-{{ d_str[5:7] }}-{{ d_str[:4] }}
+                            {% else %}
+                                {{ d_str }}
+                            {% endif %}
+                        </td>
+                        <td><span class="status status-holiday">{{ h['name'] }}</span></td>
+                        {% if user_role == 'admin' %}
+                        <td class="row-actions" style="text-align: left;">
+                            <form method="POST" action="{{ url_for('delete_holiday', holiday_id=h['id']) }}"
+                                  onsubmit="return confirm('Remove this holiday?');">
+                                <button type="submit" class="btn-delete">Delete</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="empty-note">No holidays set up yet.</p>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

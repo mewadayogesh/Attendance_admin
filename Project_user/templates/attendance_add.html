@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Add Attendance Record{% endblock %}
+{% set active_page = 'report' %}
+
+{% block content %}
+<div class="form-panel">
+    <h2>Add Missed Attendance Record</h2>
+    <p style="margin-top:-10px; color:#6b7280; font-size:14px;">
+        Use this when an employee forgot to check in or out and no record exists yet for that day.
+    </p>
+
+    <form method="POST" action="{{ url_for('add_attendance') }}">
+        <div class="input-group">
+            <label>Employee</label>
+            <select name="employee_id" required style="width:100%;padding:10px;border:2px solid #0e409c;border-radius:4px;font-size:15px;">
+                <option value="">— Select employee —</option>
+                {% for e in employees %}
+                <option value="{{ e['id'] }}">{{ e['name'] }} ({{ e['employee_id'] }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>Date</label>
+            <input type="date" name="work_date" required>
+        </div>
+
+        <div class="input-group">
+            <label>Check In</label>
+            <input type="time" name="check_in" step="1">
+        </div>
+
+        <div class="input-group">
+            <label>Check Out</label>
+            <input type="time" name="check_out" step="1">
+        </div>
+
+        <div class="input-group">
+            <label>Status</label>
+            <select name="status" style="width:100%;padding:10px;border:2px solid #0e409c;border-radius:4px;font-size:15px;">
+                <option value="Present">Present</option>
+                <option value="Half Day">Half Day</option>
+                <option value="Leave">Leave</option>
+                <option value="Absent">Absent</option>
+            </select>
+        </div>
+
+        <div class="button-group">
+            <button type="submit" class="btn-save">Save Record</button>
+            <a href="{{ url_for('report_attendance') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
