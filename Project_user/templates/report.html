@@ -28,10 +28,7 @@
         box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3);
 
     }
-
-
     
-
     /* Grid Layout for Report Cards */
     .report-links {
         display: grid;
@@ -60,9 +57,9 @@
     .report-card::after {
         content: "→";
         position: absolute;
-        bottom: 20px;
-        right: 24px;
-        font-size: 18px;
+        bottom: 10px;            /*20px*/
+        right: 26px;            /*24px*/
+        font-size: 36px;        /*18px*/
         color: #9ca3af;
         transition: transform 0.3s ease, color 0.3s ease;
     }
@@ -141,9 +138,8 @@
         </a>
     </div>
 </div>
-
 <!--comment-->
-<!--this button for email sending reports-->
+<!--sending report in email-->
 <form action="{{ url_for('send_attendance_email') }}" method="POST" style="margin-top: 20px;">
     <button type="submit" style="background-color: #2563eb; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
         📧 Send Report to My Email
