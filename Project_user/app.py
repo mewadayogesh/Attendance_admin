@@ -1,7 +1,7 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBas
+from email.mime.base import MIMEBase
 from email import encoders
 import io
 import os
@@ -41,18 +41,6 @@ db.init_app(app)
 # ---------------------------------------------------------------------------
 # Email configuration
 # ---------------------------------------------------------------------------
-# IMPORTANT: never hardcode real credentials in source. Set these as actual
-# environment variables (e.g. in a .env file that is gitignored, or in your
-# hosting provider's secrets manager) before running the app:
-#
-#   export MAIL_SENDER_EMAIL="digitalcrest781@gmail.com"
-#   export MAIL_SENDER_PASSWORD="<gmail app password>"
-#   export MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
-#
-# If a Gmail account password (not a generated "App Password") was ever
-# committed to source control or shared in plaintext anywhere, treat it as
-# compromised and rotate/regenerate it in your Google Account security
-# settings regardless of whether this app is public.
 MAIL_SENDER_EMAIL = os.environ.get('MAIL_SENDER_EMAIL', '')
 MAIL_SENDER_PASSWORD = os.environ.get('MAIL_SENDER_PASSWORD', '')
 MAIL_RECIPIENT_EMAIL = os.environ.get('MAIL_RECIPIENT_EMAIL', '')
@@ -85,11 +73,7 @@ def roles_required(*allowed_roles):
 
 
 def build_xlsx_buffer(headers, rows):
-    """Build an in-memory .xlsx workbook and return its BytesIO buffer.
-
-    Shared by the download routes (via make_xlsx_response) and the email
-    route (which needs the raw bytes to attach rather than send_file).
-    """
+    """Build an in-memory .xlsx workbook and return its BytesIO buffer."""
     wb = Workbook()
     ws = wb.active
     ws.append(headers)
@@ -119,11 +103,6 @@ def make_xlsx_response(headers, rows, filename):
 
 
 def format_date_ddmmyyyy(value):
-    """Convert a 'YYYY-MM-DD' string to 'DD-MM-YYYY' for Excel display.
-
-    Leaves the value untouched if it's empty/None or doesn't match the
-    expected format (so we never crash the export on odd/legacy data).
-    """
     if not value:
         return value
     try:
@@ -133,11 +112,6 @@ def format_date_ddmmyyyy(value):
 
 
 def format_datetime_ddmmyyyy(value):
-    """Convert a 'YYYY-MM-DD HH:MM:SS' string to 'DD-MM-YYYY HH:MM:SS'.
-
-    Leaves the value untouched if it's empty/None or doesn't match the
-    expected format.
-    """
     if not value:
         return value
     try:
@@ -165,18 +139,10 @@ def get_attendance_or_404(attendance_id):
 
 
 def get_current_employee():
-    """Resolve the logged-in user to an employees row, if any.
-
-    Prefers the explicit users.linked_employee_id set from Add/Edit User.
-    Falls back to matching by name/employee code (mirrors the old
-    behaviour in the leave() view) so existing accounts keep working
-    without needing to be re-linked by hand.
-    """
     username = session.get('username')
     if not username:
         return None
     conn = db.get_db()
-    #Query run to fetching data from database (fetchone)
     user_row = conn.execute('SELECT linked_employee_id FROM users WHERE username = ?', (username,)).fetchone()
     if user_row and user_row['linked_employee_id']:
         emp = conn.execute('SELECT * FROM employees WHERE id = ?', (user_row['linked_employee_id'],)).fetchone()
@@ -479,7 +445,7 @@ def delete_employee(employee_id):
 
 
 # ---------------------------------------------------------------------------
-# Leave requests auto fetching the employee id
+# Leave requests
 # ---------------------------------------------------------------------------
 
 @app.route('/leave', methods=['GET', 'POST'])
@@ -587,7 +553,7 @@ def update_leave_status(request_id, action):
 
 
 # ---------------------------------------------------------------------------
-# Attendance — self-service punch clock
+# Attendance
 # ---------------------------------------------------------------------------
 
 @app.route('/attendance', methods=['GET'])
@@ -715,13 +681,8 @@ def attendance_calendar():
             iso = f'{year:04d}-{month:02d}-{day_num:02d}'
             info = day_status.get(iso)
             holiday_name = holiday_map.get(iso)
-            is_sunday = datetime(year, month, day_num).weekday() == 6  # Monday=0 ... Sunday=6
+            is_sunday = datetime(year, month, day_num).weekday() == 6
 
-            # Priority: an actual punched-in record always wins — an employee
-            # who came in on a Sunday or a declared holiday still shows their
-            # real attendance, just tagged as "worked on holiday/weekend" so
-            # nothing gets hidden. Only fall back to the Holiday/Weekend
-            # label when nobody actually checked in that day.
             if info:
                 status_label = info['status']
                 css = (info['status'] or '').lower().replace(' ', '')
@@ -783,7 +744,7 @@ def attendance_calendar():
 
 
 # ---------------------------------------------------------------------------
-# Holidays (admin-managed, visible to everyone on the calendar)
+# Holidays
 # ---------------------------------------------------------------------------
 
 @app.route('/holidays', methods=['GET'])
@@ -810,13 +771,12 @@ def add_holiday():
         flash('A holiday is already set for that date. Delete it first if you want to rename it.', 'error')
         return redirect(url_for('holidays'))
 
-    local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     conn.execute(
         'INSERT INTO holidays (holiday_date, name, created_at) VALUES (?, ?, ?)',
-        (holiday_date, name, local_timestamp)
+        (holiday_date, name, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     )
     conn.commit()
-    flash(f'Holiday "{name}" added.', 'success')
+    flash('Holiday added successfully.', 'success')
     return redirect(url_for('holidays'))
 
 
@@ -826,49 +786,42 @@ def delete_holiday(holiday_id):
     conn = db.get_db()
     conn.execute('DELETE FROM holidays WHERE id = ?', (holiday_id,))
     conn.commit()
-    flash('Holiday removed.', 'success')
+    flash('Holiday deleted.', 'success')
     return redirect(url_for('holidays'))
 
 
 # ---------------------------------------------------------------------------
-# Attendance — admin/editor management (fix missed check-ins/outs)
+# Attendance Management & Reports
 # ---------------------------------------------------------------------------
 
 @app.route('/report/attendance')
 @login_required
 def report_attendance():
-    """Attendance report.
-
-    - Users always see only their own linked-employee attendance.
-    - Admin/editor see everyone by default, can narrow with the
-      ?employee_id=<id> dropdown filter, and/or can free-text search by
-      the employee's custom Employee ID via ?search_emp_id=<text>
-      (partial, case-insensitive match, e.g. 'd1' matches 'EMP-D101').
-      Both filters can be combined.
-    """
     conn = db.get_db()
     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
-
+    
     base_query = '''
         SELECT a.*, e.name AS employee_name, e.employee_id AS custom_emp_id
         FROM attendance a
         LEFT JOIN employees e ON a.employee_id = e.id
     '''
-
-    params = []
     where_clauses = []
+    params = []
+
     filter_employee_id = None
     search_emp_id = request.args.get('search_emp_id', '').strip()
 
     if session.get('role') == 'user':
-        my_employee = get_current_employee()
-        filter_employee_id = my_employee['id'] if my_employee else -1
-        where_clauses.append('a.employee_id = ?')
-        params.append(filter_employee_id)
+        my_emp = get_current_employee()
+        if my_emp:
+            where_clauses.append('a.employee_id = ?')
+            params.append(my_emp['id'])
+        else:
+            where_clauses.append('1 = 0')
     else:
-        requested = request.args.get('employee_id', '').strip()
-        if requested:
-            filter_employee_id = int(requested)
+        req_emp = request.args.get('employee_id', '').strip()
+        if req_emp:
+            filter_employee_id = int(req_emp)
             where_clauses.append('a.employee_id = ?')
             params.append(filter_employee_id)
 
@@ -878,29 +831,61 @@ def report_attendance():
 
     if where_clauses:
         base_query += ' WHERE ' + ' AND '.join(where_clauses)
+
     base_query += ' ORDER BY a.work_date DESC, a.id DESC'
 
-    records = conn.execute(base_query, params).fetchall()
-
-    viewing_employee_name = None
-    if filter_employee_id:
-        emp_row = conn.execute('SELECT name FROM employees WHERE id = ?', (filter_employee_id,)).fetchone()
-        viewing_employee_name = emp_row['name'] if emp_row else None
+    rows = conn.execute(base_query, params).fetchall()
 
     return render_template(
         'report_attendance.html',
-        records=records,
+        rows=rows,
         employees=employees,
         filter_employee_id=filter_employee_id,
         search_emp_id=search_emp_id,
-        viewing_employee_name=viewing_employee_name,
         user_role=session.get('role'),
     )
 
 
-@app.route('/attendance/add', methods=['GET', 'POST'])
+@app.route('/report/attendance/add', methods=['POST'])
 @roles_required('admin', 'editor')
 def add_attendance():
+    conn = db.get_db()
+    employee_id = request.form.get('employee_id', '').strip()
+    work_date = request.form.get('work_date', '').strip()
+    check_in = request.form.get('check_in', '').strip() or None
+    check_out = request.form.get('check_out', '').strip() or None
+    status = request.form.get('status', 'Present').strip()
+
+    if not employee_id or not work_date:
+        flash('Employee and Work Date are required.', 'error')
+        return redirect(url_for('report_attendance'))
+
+    existing = conn.execute(
+        'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ?',
+        (employee_id, work_date)
+    ).fetchone()
+
+    if existing:
+        flash('An attendance record for this employee on this date already exists. Edit it instead.', 'error')
+        return redirect(url_for('report_attendance'))
+
+    conn.execute(
+        'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status) VALUES (?, ?, ?, ?, ?)',
+        (employee_id, work_date, check_in, check_out, status)
+    )
+    conn.commit()
+    flash('Attendance record added successfully.', 'success')
+    return redirect(url_for('report_attendance'))
+
+
+@app.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
+@roles_required('admin', 'editor')
+def edit_attendance(attendance_id):
+    att = get_attendance_or_404(attendance_id)
+    if att is None:
+        flash('That attendance record no longer exists.', 'error')
+        return redirect(url_for('report_attendance'))
+
     conn = db.get_db()
     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
 
@@ -912,67 +897,18 @@ def add_attendance():
         status = request.form.get('status', 'Present').strip()
 
         if not employee_id or not work_date:
-            flash('Employee and date are required.', 'error')
-            return render_template('attendance_add.html', employees=employees)
-
-        existing = conn.execute(
-            'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ?', (employee_id, work_date)
-        ).fetchone()
-        if existing:
-            flash('An attendance record already exists for that employee and date — edit it instead.', 'error')
-            return redirect(url_for('edit_attendance', attendance_id=existing['id']))
-
-        local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        conn.execute(
-            'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status, created_at) '
-            'VALUES (?, ?, ?, ?, ?, ?)',
-            (employee_id, work_date, check_in, check_out, status, local_timestamp),
-        )
-        conn.commit()
-        flash('Attendance record added successfully.', 'success')
-        return redirect(url_for('report_attendance'))
-
-    return render_template('attendance_add.html', employees=employees)
-
-
-@app.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
-@roles_required('admin', 'editor')
-def edit_attendance(attendance_id):
-    record = get_attendance_or_404(attendance_id)
-    if record is None:
-        flash('That attendance record no longer exists.', 'error')
-        return redirect(url_for('report_attendance'))
-
-    conn = db.get_db()
-    employee = conn.execute('SELECT * FROM employees WHERE id = ?', (record['employee_id'],)).fetchone()
-
-    if request.method == 'POST':
-        work_date = request.form.get('work_date', '').strip()
-        check_in = request.form.get('check_in', '').strip() or None
-        check_out = request.form.get('check_out', '').strip() or None
-        status = request.form.get('status', 'Present').strip()
-
-        if not work_date:
-            flash('Date is required.', 'error')
-            return redirect(url_for('edit_attendance', attendance_id=attendance_id))
-
-        duplicate = conn.execute(
-            'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ? AND id != ?',
-            (record['employee_id'], work_date, attendance_id)
-        ).fetchone()
-        if duplicate:
-            flash('Another attendance record already exists for that employee and date.', 'error')
-            return redirect(url_for('edit_attendance', attendance_id=attendance_id))
+            flash('Employee and Work Date are required.', 'error')
+            return render_template('attendance_edit.html', att=att, employees=employees)
 
         conn.execute(
-            'UPDATE attendance SET work_date = ?, check_in = ?, check_out = ?, status = ? WHERE id = ?',
-            (work_date, check_in, check_out, status, attendance_id),
+            'UPDATE attendance SET employee_id = ?, work_date = ?, check_in = ?, check_out = ?, status = ? WHERE id = ?',
+            (employee_id, work_date, check_in, check_out, status, attendance_id)
         )
         conn.commit()
-        flash('Attendance record updated successfully.', 'success')
+        flash('Attendance record updated.', 'success')
         return redirect(url_for('report_attendance'))
 
-    return render_template('attendance_edit.html', record=record, employee=employee, statuses=ATTENDANCE_STATUSES)
+    return render_template('attendance_edit.html', att=att, employees=employees)
 
 
 @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
@@ -986,20 +922,8 @@ def delete_attendance(attendance_id):
 
 
 # ---------------------------------------------------------------------------
-# Reports (landing + employees)
+# Reports (Lists & Excel exports)
 # ---------------------------------------------------------------------------
-
-@app.route('/report')
-@login_required
-def report():
-    conn = db.get_db()
-    employee_count = conn.execute('SELECT COUNT(*) AS c FROM employees').fetchone()['c']
-    if session.get('role') == 'user':
-        leave_count = conn.execute('SELECT COUNT(*) AS c FROM leave_requests WHERE submitted_by = ?', (session.get('username'),)).fetchone()['c']
-    else:
-        leave_count = conn.execute('SELECT COUNT(*) AS c FROM leave_requests').fetchone()['c']
-    return render_template('report.html', employee_count=employee_count, leave_count=leave_count)
-
 
 @app.route('/report/employees')
 @login_required
@@ -1009,149 +933,108 @@ def report_employees():
     return render_template('report_employees.html', employees=employees, user_role=session.get('role'))
 
 
+@app.route('/export/employees')
+@roles_required('admin', 'editor')
+def export_employees():
+    conn = db.get_db()
+    rows = conn.execute(
+        'SELECT id, name, employee_id, designation, dob, date_of_joining, created_at FROM employees ORDER BY id ASC'
+    ).fetchall()
+
+    formatted_rows = []
+    for r in rows:
+        formatted_rows.append([
+            r['id'],
+            r['name'],
+            r['employee_id'],
+            r['designation'],
+            format_date_ddmmyyyy(r['dob']),
+            format_date_ddmmyyyy(r['date_of_joining']),
+            format_datetime_ddmmyyyy(r['created_at']),
+        ])
+
+    headers = ['ID', 'Name', 'Employee ID', 'Designation', 'Date of Birth', 'Date of Joining', 'Created At']
+    return make_xlsx_response(headers, formatted_rows, 'employees_report.xlsx')
+
+
 @app.route('/report/leave')
 @login_required
 def report_leave():
     conn = db.get_db()
     if session.get('role') == 'user':
-        leave_requests = conn.execute('SELECT * FROM leave_requests WHERE submitted_by = ? ORDER BY id ASC', (session.get('username'),)).fetchall()
+        rows = conn.execute(
+            'SELECT * FROM leave_requests WHERE submitted_by = ? ORDER BY id DESC',
+            (session.get('username'),)
+        ).fetchall()
     else:
-        leave_requests = conn.execute('SELECT * FROM leave_requests ORDER BY id ASC').fetchall()
-    return render_template('report_leave.html', leave_requests=leave_requests, user_role=session.get('role'))
+        rows = conn.execute('SELECT * FROM leave_requests ORDER BY id DESC').fetchall()
+    return render_template('report_leave.html', rows=rows, user_role=session.get('role'))
 
 
-# ---------------------------------------------------------------------------
-# Excel downloads
-# ---------------------------------------------------------------------------
-
-@app.route('/report/download/employees.xlsx')
-@login_required
-def download_employees_xlsx():
+@app.route('/export/leave')
+@roles_required('admin', 'editor')
+def export_leave():
     conn = db.get_db()
-    rows = conn.execute('SELECT * FROM employees ORDER BY id ASC').fetchall()
-    headers = ['ID', 'Name', 'Employee ID', 'Designation', 'DOB', 'Date of Joining', 'Created At']
-    data = [
-        [idx, r['name'], r['employee_id'], r['designation'], format_date_ddmmyyyy(r['dob']),
-         format_date_ddmmyyyy(r['date_of_joining']), format_datetime_ddmmyyyy(r['created_at'])]
-        for idx, r in enumerate(rows, start=1)
+    rows = conn.execute(
+        'SELECT id, employee_id, dates, num_days, reason, description, request_date, status, submitted_by, created_at '
+        'FROM leave_requests ORDER BY id ASC'
+    ).fetchall()
+
+    formatted_rows = []
+    for r in rows:
+        formatted_rows.append([
+            r['id'],
+            r['employee_id'],
+            r['dates'],
+            r['num_days'],
+            r['reason'],
+            r['description'],
+            format_date_ddmmyyyy(r['request_date']),
+            r['status'],
+            r['submitted_by'],
+            format_datetime_ddmmyyyy(r['created_at']),
+        ])
+
+    headers = [
+        'ID', 'Employee ID', 'Dates', 'Num Days', 'Reason', 'Description',
+        'Request Date', 'Status', 'Submitted By', 'Created At'
     ]
-    return make_xlsx_response(headers, data, 'employees.xlsx')
+    return make_xlsx_response(headers, formatted_rows, 'leave_requests_report.xlsx')
 
 
-@app.route('/report/download/leave_requests.xlsx')
-@login_required
-def download_leave_requests_xlsx():
+@app.route('/export/attendance')
+@roles_required('admin', 'editor')
+def export_attendance():
     conn = db.get_db()
-    if session.get('role') == 'user':
-        rows = conn.execute('SELECT * FROM leave_requests WHERE submitted_by = ? ORDER BY id ASC', (session.get('username'),)).fetchall()
-    else:
-        rows = conn.execute('SELECT * FROM leave_requests ORDER BY id ASC').fetchall()
-
-    headers = ['ID', 'Requested By', 'Employee ID', 'Dates', 'Number of Days', 'Reason',
-               'Description', 'Date of Request', 'Status', 'Created At']
-
-    data = [
-        [idx, r['submitted_by'], r['employee_id'], r['dates'], r['num_days'], r['reason'],
-         r['description'], format_date_ddmmyyyy(r['request_date']), r['status'],
-         format_datetime_ddmmyyyy(r['created_at'])]
-        for idx, r in enumerate(rows, start=1)
-    ]
-    return make_xlsx_response(headers, data, 'leave_requests.xlsx')
-
-
-def _build_attendance_report(role, username):
-    """Shared query builder used by both the download route and the email
-    route, so both always produce an identical report."""
-    conn = db.get_db()
-
-    base_query = '''
-        SELECT a.id, e.name AS employee_name, e.employee_id AS custom_emp_id, a.work_date, a.check_in, a.check_out, a.status, a.created_at
+    rows = conn.execute(
+        '''
+        SELECT a.id, e.employee_id AS custom_emp_id, e.name AS employee_name,
+               a.work_date, a.check_in, a.check_out, a.status
         FROM attendance a
         LEFT JOIN employees e ON a.employee_id = e.id
-    '''
+        ORDER BY a.work_date DESC, a.id DESC
+        '''
+    ).fetchall()
 
-    filename = 'attendance.xlsx'
-    where_clauses = []
-    params = []
+    formatted_rows = []
+    for r in rows:
+        formatted_rows.append([
+            r['id'],
+            r['custom_emp_id'],
+            r['employee_name'],
+            format_date_ddmmyyyy(r['work_date']),
+            r['check_in'],
+            r['check_out'],
+            r['status'],
+        ])
 
-    if role == 'user':
-        my_employee = get_current_employee()
-        emp_id = my_employee['id'] if my_employee else None
-        where_clauses.append('a.employee_id = ?')
-        params.append(emp_id)
-        if my_employee:
-            filename = f"attendance_{my_employee['employee_id']}.xlsx"
-    else:
-        requested = request.args.get('employee_id', '').strip()
-        if requested:
-            where_clauses.append('a.employee_id = ?')
-            params.append(requested)
-            emp = conn.execute('SELECT employee_id FROM employees WHERE id = ?', (requested,)).fetchone()
-            if emp:
-                filename = f"attendance_{emp['employee_id']}.xlsx"
-
-        search_emp_id = request.args.get('search_emp_id', '').strip()
-        if search_emp_id:
-            where_clauses.append('e.employee_id LIKE ?')
-            params.append(f'%{search_emp_id}%')
-
-    query = base_query
-    if where_clauses:
-        query += ' WHERE ' + ' AND '.join(where_clauses)
-    query += ' ORDER BY a.work_date ASC'
-
-    rows = conn.execute(query, params).fetchall()
-
-    headers = ['ID', 'Employee Name', 'Employee ID', 'Work Date', 'Check In', 'Check Out', 'Status', 'Created At']
-    data = [
-        [idx, r['employee_name'] or 'Unknown', r['custom_emp_id'] or '', format_date_ddmmyyyy(r['work_date']),
-         r['check_in'], r['check_out'], r['status'], format_datetime_ddmmyyyy(r['created_at'])]
-        for idx, r in enumerate(rows, start=1)
-    ]
-    return headers, data, filename
+    headers = ['ID', 'Employee ID', 'Employee Name', 'Work Date', 'Check In', 'Check Out', 'Status']
+    return make_xlsx_response(headers, formatted_rows, 'attendance_report.xlsx')
 
 
-@app.route('/report/download/attendance.xlsx')
-@login_required
-def download_attendance_xlsx():
-    """Download attendance as Excel.
-
-    - Users always get only their own linked-employee attendance.
-    - Admin/editor get everyone by default, or can pass ?employee_id=<id>
-      to download the record for one particular employee only, or
-      ?search_emp_id=<text> to download only rows matching that custom
-      Employee ID (partial match) — mirrors the filters on the on-screen
-      attendance report page. Both can be combined.
-    """
-    headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-    return make_xlsx_response(headers, data, filename)
-
-
-# User request
-@app.route('/user-request', methods=['GET', 'POST'])
-@login_required
-def user_request():
-    conn = db.get_db()
-    username = session.get('username')
-
-    # Auto-fetch employee ID matching the logged-in username
-    emp_record = conn.execute('SELECT employee_id FROM employees WHERE name = ? OR employee_id = ?', (username, username)).fetchone()
-    auto_employee_id = emp_record['employee_id'] if emp_record else ''
-
-    if request.method == 'POST':
-        employee_id = request.form.get('employee_id', '').strip() or auto_employee_id
-        missed_date = request.form.get('missed_date', '').strip()
-        request_date = request.form.get('request_date', '').strip()
-        reason = request.form.get('reason', '').strip()
-
-        if not employee_id or not missed_date or not request_date or not reason:
-            flash('All required fields must be filled out.', 'error')
-            return render_template('user_request.html', employee_id=auto_employee_id)
-
-    # Insert logic here...
-
-    return render_template('user_request.html', employee_id=auto_employee_id)
-
+# ---------------------------------------------------------------------------
+# Email Feature Route
+# ---------------------------------------------------------------------------
 
 @app.route('/send-attendance-email', methods=['POST'])
 @login_required
@@ -1162,10 +1045,10 @@ def send_attendance_email():
 
     if not sender_email or not sender_password or not recipient_email:
         flash('Email settings are missing in environment variables.', 'error')
-        return redirect(url_for('report_leave'))
+        return redirect(url_for('report_attendance'))
 
     subject = "Attendance Report"
-    body = "Hello,\n\nPlease find your requested attendance report.\n\nBest Regards,\nHR System"
+    body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
 
     msg = MIMEMultipart()
     msg['From'] = sender_email
@@ -1183,7 +1066,12 @@ def send_attendance_email():
     except Exception as e:
         flash(f'Failed to send email: {e}', 'error')
 
-    return redirect(url_for('report_leave'))
+    return redirect(url_for('report_attendance'))
+
+
+# ---------------------------------------------------------------------------
+# Main Entry Point
+# ---------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5002, debug=True)
+    app.run(debug=True, port=5000)
