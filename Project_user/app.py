@@ -7,22 +7,29 @@ import io
 import os
 import traceback
 import calendar as cal
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
-
-from datetime import datetime, timedelta
-
-# Create a helper function for your local time (e.g., IST is UTC + 5 hours 30 mins)
+# ---------------------------------------------------------------------------
+# Timezone
+# ---------------------------------------------------------------------------
+# Render's servers run in UTC regardless of your local machine's clock.
+# datetime.now() on Render therefore returns UTC time, not IST — this was
+# the cause of check-in/out times and dates showing ~5.5 hours behind.
+#
+# Fix: use get_local_time() everywhere instead of datetime.now(). It always
+# returns the current time shifted to IST (UTC+5:30), so it's correct both
+# locally and on Render without relying on OS/platform timezone settings.
+#
+# (Optional extra step on Render: Dashboard -> your service -> Environment
+# -> add TZ = Asia/Kolkata. Some platforms honor this for OS-level time,
+# but Python's datetime.now() does NOT reliably respect it, so this env
+# var is a nice-to-have, not a substitute for get_local_time() below.)
 def get_local_time():
-    utc_now = datetime.utcnow()
-    # Change the hours and minutes to match your specific country's time zone offset
-    local_time = utc_now + timedelta(hours=5, minutes=30)
-    return local_time
+    """Return current time in IST (UTC+5:30)."""
+    return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
-# Then use get_local_time() instead of datetime.now() when saving check-ins:
-# now = get_local_time().strftime('%H:%M:%S')
-# today = get_local_time().strftime('%Y-%m-%d')
+
 # Loads variables from a local .env file (if present) into os.environ, so
 # MAIL_SENDER_EMAIL / MAIL_SENDER_PASSWORD / MAIL_RECIPIENT_EMAIL etc. can be
 # set once in .env instead of exporting them in every terminal session.
@@ -58,17 +65,14 @@ db.init_app(app)
 # environment variables (e.g. in a .env file that is gitignored, or in your
 # hosting provider's secrets manager) before running the app:
 #
-#   export MAIL_SENDER_EMAIL="digitalcrest781@gmail.com"
-#   export MAIL_SENDER_PASSWORD="<gmail app password>"
-#   export MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
+#   MAIL_SENDER_EMAIL=your-account@gmail.com
+#   MAIL_SENDER_PASSWORD=<gmail app password, NOT your login password>
+#   MAIL_RECIPIENT_EMAIL=recipient@example.com
 #
 # If a Gmail account password (not a generated "App Password") was ever
 # committed to source control or shared in plaintext anywhere, treat it as
 # compromised and rotate/regenerate it in your Google Account security
 # settings regardless of whether this app is public.
-MAIL_SENDER_EMAIL = os.environ.get('MAIL_SENDER_EMAIL', '')
-MAIL_SENDER_PASSWORD = os.environ.get('MAIL_SENDER_PASSWORD', '')
-MAIL_RECIPIENT_EMAIL = os.environ.get('MAIL_RECIPIENT_EMAIL', '')
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +269,7 @@ def dashboard():
     my_employee = get_current_employee()
     my_attendance_today = None
     if my_employee:
-        today = datetime.now().strftime('%Y-%m-%d')
+        today = get_local_time().strftime('%Y-%m-%d')
         row = conn.execute(
             'SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?', (my_employee['id'], today)
         ).fetchone()
@@ -310,7 +314,7 @@ def add_user():
             flash('Username already exists. Choose a different one.', 'error')
             return render_template('add_user.html', employees=employees)
 
-        local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
         conn.execute(
             'INSERT INTO users (username, password, role, linked_employee_id, created_at) VALUES (?, ?, ?, ?, ?)',
             (username, password, role, linked_employee_id, local_timestamp)
@@ -412,7 +416,7 @@ def new_entry():
                 name=name, employee_id=employee_id, designation=designation, dob=dob, date_of_joining=date_of_joining
             )
 
-        local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
         conn.execute(
             'INSERT INTO employees (name, employee_id, designation, dob, date_of_joining, created_at) '
@@ -515,7 +519,7 @@ def leave():
             flash('All required fields must be filled out.', 'error')
             return render_template('leave.html', employee_id=auto_employee_id, dates=dates, num_days=num_days, reason=reason, request_date=request_date)
 
-        local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
 
         conn.execute(
             'INSERT INTO leave_requests (employee_id, dates, num_days, reason, description, request_date, '
@@ -612,7 +616,7 @@ def attendance_home():
         return redirect(url_for('dashboard'))
 
     conn = db.get_db()
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = get_local_time().strftime('%Y-%m-%d')
     today_row = conn.execute(
         'SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?', (employee['id'], today)
     ).fetchone()
@@ -631,8 +635,8 @@ def attendance_check_in():
         return {'error': 'no employee record linked to this account'}, 400
 
     conn = db.get_db()
-    today = datetime.now().strftime('%Y-%m-%d')
-    now = datetime.now().strftime('%H:%M:%S')
+    today = get_local_time().strftime('%Y-%m-%d')
+    now = get_local_time().strftime('%H:%M:%S')
 
     existing = conn.execute(
         'SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?', (employee['id'], today)
@@ -656,8 +660,8 @@ def attendance_check_out():
         return {'error': 'no employee record linked to this account'}, 400
 
     conn = db.get_db()
-    today = datetime.now().strftime('%Y-%m-%d')
-    now = datetime.now().strftime('%H:%M:%S')
+    today = get_local_time().strftime('%Y-%m-%d')
+    now = get_local_time().strftime('%H:%M:%S')
 
     existing = conn.execute(
         'SELECT * FROM attendance WHERE employee_id = ? AND work_date = ?', (employee['id'], today)
@@ -676,7 +680,7 @@ def attendance_check_out():
 @login_required
 def attendance_calendar():
     conn = db.get_db()
-    now = datetime.now()
+    now = get_local_time()
     year = int(request.args.get('year', now.year))
     month = int(request.args.get('month', now.month))
 
@@ -823,7 +827,7 @@ def add_holiday():
         flash('A holiday is already set for that date. Delete it first if you want to rename it.', 'error')
         return redirect(url_for('holidays'))
 
-    local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
     conn.execute(
         'INSERT INTO holidays (holiday_date, name, created_at) VALUES (?, ?, ?)',
         (holiday_date, name, local_timestamp)
@@ -935,7 +939,7 @@ def add_attendance():
             flash('An attendance record already exists for that employee and date — edit it instead.', 'error')
             return redirect(url_for('edit_attendance', attendance_id=existing['id']))
 
-        local_timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
         conn.execute(
             'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status, created_at) '
             'VALUES (?, ?, ?, ?, ?, ?)',
@@ -1164,8 +1168,12 @@ def user_request():
     # Insert logic here...
 
     return render_template('user_request.html', employee_id=auto_employee_id)
-#email code
-# email code
+
+
+# ---------------------------------------------------------------------------
+# Email — send attendance report as an .xlsx attachment
+# ---------------------------------------------------------------------------
+
 @app.route('/send-attendance-email', methods=['POST'])
 @login_required
 def send_attendance_email():
@@ -1187,7 +1195,13 @@ def send_attendance_email():
         xlsx_buffer = build_xlsx_buffer(headers, data)
 
         subject = "Attendance Report"
-        body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+        sent_at = get_local_time().strftime('%d-%m-%Y %H:%M:%S')
+        body = (
+            "Hello,\n\n"
+            "Please find your requested attendance report attached.\n\n"
+            f"Report generated: {sent_at} (IST)\n\n"
+            "Best Regards,\nHR System"
+        )
 
         msg = MIMEMultipart()
         msg['From'] = sender_email
@@ -1209,123 +1223,13 @@ def send_attendance_email():
 
         flash('Attendance report sent to your email successfully!', 'success')
     except Exception as e:
+        # Full traceback goes to server logs (Render -> Logs tab); the
+        # user just sees a short, non-technical flash message.
         app.logger.error("send_attendance_email failed: %s", e)
         traceback.print_exc()
         flash(f'Failed to send email: {e}', 'error')
 
     return redirect(url_for('report_leave'))
-# second old code
-# @app.route('/send-attendance-email', methods=['POST'])
-# @login_required
-# def send_attendance_email():
-#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
-#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
-#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-
-#     if not sender_email or not sender_password or not recipient_email:
-#         flash('Email is not configured on the server. Check environment variables.', 'error')
-#         return redirect(url_for('report_leave'))
-
-#     subject = "Attendance Report"
-#     body = "Hello,\n\nPlease find attached or enclosed your requested attendance report.\n\nBest Regards,\nHR System"
-#     ...
-#old working code
-# @app.route('/send-attendance-email', methods=['POST'])
-# @login_required
-# def send_attendance_email():
-#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
-#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
-#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-    
-#     # Use your alternative provider's SMTP host (e.g., Brevo, SendGrid, or Office365)
-#     smtp_host = os.environ.get('MAIL_SMTP_HOST', 'smtp-relay.brevo.com')
-#     smtp_port = int(os.environ.get('MAIL_SMTP_PORT', 587))
-
-#     if not sender_email or not sender_password or not recipient_email:
-#         flash('Email settings are missing in environment variables.', 'error')
-#         return redirect(url_for('report_attendance'))
-
-#     subject = "Attendance Report"
-#     body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
-
-#     msg = MIMEMultipart()
-#     msg['From'] = sender_email
-#     msg['To'] = recipient_email
-#     msg['Subject'] = subject
-#     msg.attach(MIMEText(body, 'plain'))
-
-#     try:
-#         server = smtplib.SMTP(smtp_host, smtp_port)
-#         server.starttls()
-#         server.login(sender_email, sender_password)
-#         server.sendmail(sender_email, recipient_email, msg.as_string())
-#         server.quit()
-#         flash('Attendance report sent successfully!', 'success')
-#     except Exception as e:
-#         flash(f'Failed to send email: {str(e)}', 'error')
-
-#     return redirect(url_for('report_attendance'))
-
-#old code
-# @app.route('/send-attendance-email', methods=['POST'])
-# @login_required
-# def send_attendance_email():
-#     """Email the current attendance report (as an .xlsx attachment) to the
-#     configured recipient.
-
-#     Credentials and the recipient address come from environment variables
-#     (see the "Email configuration" block near the top of this file) rather
-#     than being hardcoded here.
-#     """
-#     if not (MAIL_SENDER_EMAIL and MAIL_SENDER_PASSWORD and MAIL_RECIPIENT_EMAIL):
-#         flash(
-#             'Email is not configured. Set MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD '
-#             'and MAIL_RECIPIENT_EMAIL as environment variables before using this feature.',
-#             'error'
-#         )
-#         return redirect(url_for('report_leave'))
-
-#     # Everything below is wrapped in one try/except so ANY failure here
-#     # (a bad DB query, a bad attachment build, or the SMTP call itself)
-#     # ends in a flash + redirect instead of an unhandled 500 error page.
-#     # The full traceback still gets printed to the server logs (visible
-#     # in Render's "Logs" tab) so the real cause is easy to find.
-#     try:
-#         # Build the same attendance report the download button produces.
-#         headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-#         xlsx_buffer = build_xlsx_buffer(headers, data)
-
-#         subject = "Attendance Report"
-#         body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
-
-#         msg = MIMEMultipart()
-#         msg['From'] = MAIL_SENDER_EMAIL
-#         msg['To'] = MAIL_RECIPIENT_EMAIL
-#         msg['Subject'] = subject
-#         msg.attach(MIMEText(body, 'plain'))
-
-#         attachment = MIMEBase('application', 'octet-stream')
-#         attachment.set_payload(xlsx_buffer.read())
-#         encoders.encode_base64(attachment)
-#         attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-#         msg.attach(attachment)
-
-#         server = smtplib.SMTP('smtp.gmail.com', 587)
-#         server.starttls()
-#         server.login(MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD)
-#         server.sendmail(MAIL_SENDER_EMAIL, MAIL_RECIPIENT_EMAIL, msg.as_string())
-#         server.quit()
-
-#         flash('Attendance report sent to your email successfully!', 'success')
-#     except Exception as e:
-#         # Print the full traceback to server logs (stdout -> visible in
-#         # Render's Logs tab) so the real cause is diagnosable, while the
-#         # user just sees a short, non-technical flash message.
-#         app.logger.error("send_attendance_email failed: %s", e)
-#         traceback.print_exc()
-#         flash(f'Failed to send email: {e}', 'error')
-
-#     return redirect(url_for('report_leave'))
 
 
 if __name__ == '__main__':
