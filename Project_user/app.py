@@ -32,11 +32,19 @@ MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
 # but Python's datetime.now() does NOT reliably respect it, so this env
 # var is a nice-to-have, not a substitute for get_local_time() below.)
 #time code 
+
+
 from datetime import datetime, timezone, timedelta
 
 def get_local_time():
-    """Return current time in Indian Standard Time (IST, UTC+5:30) on Render."""
-    return datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    """Return current time in Indian Standard Time (IST, UTC+5:30) formatted in 12-hour AM/PM."""
+    ist_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    return ist_time.strftime('%I:%M:%S %p')
+#old code
+# from datetime import datetime, timezone, timedelta
+# def get_local_time():
+#     """Return current time in Indian Standard Time (IST, UTC+5:30) on Render."""
+#     return datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
 #old code 
 # def get_local_time():
 #     """Return current time in IST (UTC+5:30)."""
