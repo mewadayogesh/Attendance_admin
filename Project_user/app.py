@@ -34,13 +34,13 @@ MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
 #time code 
 
 from datetime import datetime, timezone, timedelta
-def get_local_time():
-    """Return current time in Indian Standard Time (IST, UTC+5:30) as a datetime object in 12-hour format string if needed."""
-    ist_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-    return ist_time
+# def get_local_time():
+#     """Return current time in Indian Standard Time (IST, UTC+5:30) as a datetime object in 12-hour format string if needed."""
+#     ist_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+#     return ist_time
 
-# Use this wherever you display it on your HTML/UI:
-get_local_time().strftime('%I:%M:%S %p')
+# # Use this wherever you display it on your HTML/UI:
+# get_local_time().strftime('%I:%M:%S %p')
     
 # old code 
 # def get_local_time():
