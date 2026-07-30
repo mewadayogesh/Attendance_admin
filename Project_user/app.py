@@ -10,6 +10,19 @@ import calendar as cal
 from datetime import datetime
 from functools import wraps
 
+
+from datetime import datetime, timedelta
+
+# Create a helper function for your local time (e.g., IST is UTC + 5 hours 30 mins)
+def get_local_time():
+    utc_now = datetime.utcnow()
+    # Change the hours and minutes to match your specific country's time zone offset
+    local_time = utc_now + timedelta(hours=5, minutes=30)
+    return local_time
+
+# Then use get_local_time() instead of datetime.now() when saving check-ins:
+# now = get_local_time().strftime('%H:%M:%S')
+# today = get_local_time().strftime('%Y-%m-%d')
 # Loads variables from a local .env file (if present) into os.environ, so
 # MAIL_SENDER_EMAIL / MAIL_SENDER_PASSWORD / MAIL_RECIPIENT_EMAIL etc. can be
 # set once in .env instead of exporting them in every terminal session.
