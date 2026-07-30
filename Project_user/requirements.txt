@@ -3,3 +3,5 @@ openpyxl==3.1.5
 gunicorn
 python-dotenv
 gunicorn
+smtplib
+env.example
