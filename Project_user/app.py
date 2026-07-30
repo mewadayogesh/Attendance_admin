@@ -31,9 +31,16 @@ MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
 # -> add TZ = Asia/Kolkata. Some platforms honor this for OS-level time,
 # but Python's datetime.now() does NOT reliably respect it, so this env
 # var is a nice-to-have, not a substitute for get_local_time() below.)
+#time code 
+from datetime import datetime, timezone, timedelta
+
 def get_local_time():
-    """Return current time in IST (UTC+5:30)."""
-    return datetime.utcnow() + timedelta(hours=5, minutes=30)
+    """Return current time in Render's timezone (UTC)."""
+    return datetime.now(timezone.utc)
+#old code 
+# def get_local_time():
+#     """Return current time in IST (UTC+5:30)."""
+#     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 
 # Loads variables from a local .env file (if present) into os.environ, so
