@@ -10,6 +10,12 @@ import calendar as cal
 from datetime import datetime, timedelta
 from functools import wraps
 
+#define
+MAIL_SENDER_EMAIL="digitalcrest781@gmail.com"
+MAIL_SENDER_PASSWORD="Crest@2005$dndweb"
+MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
+
+
 # ---------------------------------------------------------------------------
 # Timezone
 # ---------------------------------------------------------------------------
@@ -1232,5 +1238,13 @@ def send_attendance_email():
     return redirect(url_for('report_leave'))
 
 
+@app.route('/debug-env-check')
+@login_required
+def debug_env_check():
+    return {
+        'MAIL_SENDER_EMAIL_set': bool(os.environ.get('MAIL_SENDER_EMAIL')),
+        'MAIL_SENDER_PASSWORD_set': bool(os.environ.get('MAIL_SENDER_PASSWORD')),
+        'MAIL_RECIPIENT_EMAIL_set': bool(os.environ.get('MAIL_RECIPIENT_EMAIL')),
+    }
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5002, debug=True)
