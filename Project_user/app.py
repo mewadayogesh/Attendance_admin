@@ -1158,35 +1158,50 @@ def send_attendance_email():
     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-    
-    # Use your alternative provider's SMTP host (e.g., Brevo, SendGrid, or Office365)
-    smtp_host = os.environ.get('MAIL_SMTP_HOST', 'smtp-relay.brevo.com')
-    smtp_port = int(os.environ.get('MAIL_SMTP_PORT', 587))
 
     if not sender_email or not sender_password or not recipient_email:
-        flash('Email settings are missing in environment variables.', 'error')
-        return redirect(url_for('report_attendance'))
+        flash('Email is not configured on the server. Check environment variables.', 'error')
+        return redirect(url_for('report_leave'))
 
     subject = "Attendance Report"
-    body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+    body = "Hello,\n\nPlease find attached or enclosed your requested attendance report.\n\nBest Regards,\nHR System"
+    ...
+#old working code
+# @app.route('/send-attendance-email', methods=['POST'])
+# @login_required
+# def send_attendance_email():
+#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
+#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
+#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
+    
+#     # Use your alternative provider's SMTP host (e.g., Brevo, SendGrid, or Office365)
+#     smtp_host = os.environ.get('MAIL_SMTP_HOST', 'smtp-relay.brevo.com')
+#     smtp_port = int(os.environ.get('MAIL_SMTP_PORT', 587))
 
-    msg = MIMEMultipart()
-    msg['From'] = sender_email
-    msg['To'] = recipient_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(body, 'plain'))
+#     if not sender_email or not sender_password or not recipient_email:
+#         flash('Email settings are missing in environment variables.', 'error')
+#         return redirect(url_for('report_attendance'))
 
-    try:
-        server = smtplib.SMTP(smtp_host, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
-        server.quit()
-        flash('Attendance report sent successfully!', 'success')
-    except Exception as e:
-        flash(f'Failed to send email: {str(e)}', 'error')
+#     subject = "Attendance Report"
+#     body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
 
-    return redirect(url_for('report_attendance'))
+#     msg = MIMEMultipart()
+#     msg['From'] = sender_email
+#     msg['To'] = recipient_email
+#     msg['Subject'] = subject
+#     msg.attach(MIMEText(body, 'plain'))
+
+#     try:
+#         server = smtplib.SMTP(smtp_host, smtp_port)
+#         server.starttls()
+#         server.login(sender_email, sender_password)
+#         server.sendmail(sender_email, recipient_email, msg.as_string())
+#         server.quit()
+#         flash('Attendance report sent successfully!', 'success')
+#     except Exception as e:
+#         flash(f'Failed to send email: {str(e)}', 'error')
+
+#     return redirect(url_for('report_attendance'))
 
 #old code
 # @app.route('/send-attendance-email', methods=['POST'])
