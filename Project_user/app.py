@@ -1152,9 +1152,14 @@ def user_request():
 
     return render_template('user_request.html', employee_id=auto_employee_id)
 #email code
+# email code
 @app.route('/send-attendance-email', methods=['POST'])
 @login_required
 def send_attendance_email():
+    """Email the current attendance report (as an .xlsx attachment) to the
+    configured recipient. Credentials come from environment variables set
+    on Render (MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD, MAIL_RECIPIENT_EMAIL).
+    """
     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
@@ -1163,9 +1168,54 @@ def send_attendance_email():
         flash('Email is not configured on the server. Check environment variables.', 'error')
         return redirect(url_for('report_leave'))
 
-    subject = "Attendance Report"
-    body = "Hello,\n\nPlease find attached or enclosed your requested attendance report.\n\nBest Regards,\nHR System"
-    ...
+    try:
+        # Build the same attendance report the download button produces
+        headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
+        xlsx_buffer = build_xlsx_buffer(headers, data)
+
+        subject = "Attendance Report"
+        body = "Hello,\n\nPlease find your requested attendance report attached.\n\nBest Regards,\nHR System"
+
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        attachment = MIMEBase('application', 'octet-stream')
+        attachment.set_payload(xlsx_buffer.read())
+        encoders.encode_base64(attachment)
+        attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+        msg.attach(attachment)
+
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+
+        flash('Attendance report sent to your email successfully!', 'success')
+    except Exception as e:
+        app.logger.error("send_attendance_email failed: %s", e)
+        traceback.print_exc()
+        flash(f'Failed to send email: {e}', 'error')
+
+    return redirect(url_for('report_leave'))
+# second old code
+# @app.route('/send-attendance-email', methods=['POST'])
+# @login_required
+# def send_attendance_email():
+#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
+#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
+#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
+
+#     if not sender_email or not sender_password or not recipient_email:
+#         flash('Email is not configured on the server. Check environment variables.', 'error')
+#         return redirect(url_for('report_leave'))
+
+#     subject = "Attendance Report"
+#     body = "Hello,\n\nPlease find attached or enclosed your requested attendance report.\n\nBest Regards,\nHR System"
+#     ...
 #old working code
 # @app.route('/send-attendance-email', methods=['POST'])
 # @login_required
