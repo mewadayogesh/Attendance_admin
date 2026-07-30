@@ -35,8 +35,8 @@ MAIL_RECIPIENT_EMAIL="ymewada6262@gmail.com"
 from datetime import datetime, timezone, timedelta
 
 def get_local_time():
-    """Return current time in Render's timezone (UTC)."""
-    return datetime.now(timezone.utc)
+    """Return current time in Indian Standard Time (IST, UTC+5:30) on Render."""
+    return datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
 #old code 
 # def get_local_time():
 #     """Return current time in IST (UTC+5:30)."""
