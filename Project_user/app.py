@@ -843,6 +843,24 @@ def delete_holiday(holiday_id):
 # ---------------------------------------------------------------------------
 # Attendance — admin/editor management (fix missed check-ins/outs)
 # ---------------------------------------------------------------------------
+from datetime import datetime
+
+def normalize_time_for_input(time_str):
+    """Helper to convert various time formats (12-hour AM/PM, text, etc.) into HH:MM for HTML time inputs."""
+    if not time_str:
+        return ''
+    time_str = str(time_str).strip()
+    
+    # Try multiple common formats stored in the database
+    for fmt in ('%H:%M:%S', '%H:%M', '%I:%M:%S %p', '%I:%M %p'):
+        try:
+            return datetime.strptime(time_str, fmt).strftime('%H:%M')
+        except ValueError:
+            continue
+            
+    # Fallback: if it's already close or just return as is if parsing fails
+    return time_str[:5] if len(time_str) >= 5 else time_str
+
 
 @app.route('/report/attendance')
 @login_required
@@ -982,7 +1000,12 @@ def edit_attendance(attendance_id):
         flash('Attendance record updated successfully.', 'success')
         return redirect(url_for('report_attendance'))
 
-    return render_template('attendance_edit.html', record=record, employee=employee, statuses=ATTENDANCE_STATUSES)
+    # Normalize times so HTML input elements can understand and display them properly
+    record_dict = dict(record)
+    record_dict['check_in'] = normalize_time_for_input(record_dict.get('check_in'))
+    record_dict['check_out'] = normalize_time_for_input(record_dict.get('check_out'))
+
+    return render_template('attendance_edit.html', record=record_dict, employee=employee, statuses=ATTENDANCE_STATUSES)
 
 
 @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
@@ -993,6 +1016,156 @@ def delete_attendance(attendance_id):
     conn.commit()
     flash('Attendance record deleted.', 'success')
     return redirect(url_for('report_attendance'))
+#old code
+# @app.route('/report/attendance')
+# @login_required
+# def report_attendance():
+#     """Attendance report.
+
+#     - Users always see only their own linked-employee attendance.
+#     - Admin/editor see everyone by default, can narrow with the
+#       ?employee_id=<id> dropdown filter, and/or can free-text search by
+#       the employee's custom Employee ID via ?search_emp_id=<text>
+#       (partial, case-insensitive match, e.g. 'd1' matches 'EMP-D101').
+#       Both filters can be combined.
+#     """
+#     conn = db.get_db()
+#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
+
+#     base_query = '''
+#         SELECT a.*, e.name AS employee_name, e.employee_id AS custom_emp_id
+#         FROM attendance a
+#         LEFT JOIN employees e ON a.employee_id = e.id
+#     '''
+
+#     params = []
+#     where_clauses = []
+#     filter_employee_id = None
+#     search_emp_id = request.args.get('search_emp_id', '').strip()
+
+#     if session.get('role') == 'user':
+#         my_employee = get_current_employee()
+#         filter_employee_id = my_employee['id'] if my_employee else -1
+#         where_clauses.append('a.employee_id = ?')
+#         params.append(filter_employee_id)
+#     else:
+#         requested = request.args.get('employee_id', '').strip()
+#         if requested:
+#             filter_employee_id = int(requested)
+#             where_clauses.append('a.employee_id = ?')
+#             params.append(filter_employee_id)
+
+#     if search_emp_id:
+#         where_clauses.append('e.employee_id LIKE ?')
+#         params.append(f'%{search_emp_id}%')
+
+#     if where_clauses:
+#         base_query += ' WHERE ' + ' AND '.join(where_clauses)
+#     base_query += ' ORDER BY a.work_date DESC, a.id DESC'
+
+#     records = conn.execute(base_query, params).fetchall()
+
+#     viewing_employee_name = None
+#     if filter_employee_id:
+#         emp_row = conn.execute('SELECT name FROM employees WHERE id = ?', (filter_employee_id,)).fetchone()
+#         viewing_employee_name = emp_row['name'] if emp_row else None
+
+#     return render_template(
+#         'report_attendance.html',
+#         records=records,
+#         employees=employees,
+#         filter_employee_id=filter_employee_id,
+#         search_emp_id=search_emp_id,
+#         viewing_employee_name=viewing_employee_name,
+#         user_role=session.get('role'),
+#     )
+
+
+# @app.route('/attendance/add', methods=['GET', 'POST'])
+# @roles_required('admin', 'editor')
+# def add_attendance():
+#     conn = db.get_db()
+#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
+
+#     if request.method == 'POST':
+#         employee_id = request.form.get('employee_id', '').strip()
+#         work_date = request.form.get('work_date', '').strip()
+#         check_in = request.form.get('check_in', '').strip() or None
+#         check_out = request.form.get('check_out', '').strip() or None
+#         status = request.form.get('status', 'Present').strip()
+
+#         if not employee_id or not work_date:
+#             flash('Employee and date are required.', 'error')
+#             return render_template('attendance_add.html', employees=employees)
+
+#         existing = conn.execute(
+#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ?', (employee_id, work_date)
+#         ).fetchone()
+#         if existing:
+#             flash('An attendance record already exists for that employee and date — edit it instead.', 'error')
+#             return redirect(url_for('edit_attendance', attendance_id=existing['id']))
+
+#         local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
+#         conn.execute(
+#             'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status, created_at) '
+#             'VALUES (?, ?, ?, ?, ?, ?)',
+#             (employee_id, work_date, check_in, check_out, status, local_timestamp),
+#         )
+#         conn.commit()
+#         flash('Attendance record added successfully.', 'success')
+#         return redirect(url_for('report_attendance'))
+
+#     return render_template('attendance_add.html', employees=employees)
+
+
+# @app.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
+# @roles_required('admin', 'editor')
+# def edit_attendance(attendance_id):
+#     record = get_attendance_or_404(attendance_id)
+#     if record is None:
+#         flash('That attendance record no longer exists.', 'error')
+#         return redirect(url_for('report_attendance'))
+
+#     conn = db.get_db()
+#     employee = conn.execute('SELECT * FROM employees WHERE id = ?', (record['employee_id'],)).fetchone()
+
+#     if request.method == 'POST':
+#         work_date = request.form.get('work_date', '').strip()
+#         check_in = request.form.get('check_in', '').strip() or None
+#         check_out = request.form.get('check_out', '').strip() or None
+#         status = request.form.get('status', 'Present').strip()
+
+#         if not work_date:
+#             flash('Date is required.', 'error')
+#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
+
+#         duplicate = conn.execute(
+#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ? AND id != ?',
+#             (record['employee_id'], work_date, attendance_id)
+#         ).fetchone()
+#         if duplicate:
+#             flash('Another attendance record already exists for that employee and date.', 'error')
+#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
+
+#         conn.execute(
+#             'UPDATE attendance SET work_date = ?, check_in = ?, check_out = ?, status = ? WHERE id = ?',
+#             (work_date, check_in, check_out, status, attendance_id),
+#         )
+#         conn.commit()
+#         flash('Attendance record updated successfully.', 'success')
+#         return redirect(url_for('report_attendance'))
+
+#     return render_template('attendance_edit.html', record=record, employee=employee, statuses=ATTENDANCE_STATUSES)
+
+
+# @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
+# @roles_required('admin', 'editor')
+# def delete_attendance(attendance_id):
+#     conn = db.get_db()
+#     conn.execute('DELETE FROM attendance WHERE id = ?', (attendance_id,))
+#     conn.commit()
+#     flash('Attendance record deleted.', 'success')
+#     return redirect(url_for('report_attendance'))
 
 
 # ---------------------------------------------------------------------------
