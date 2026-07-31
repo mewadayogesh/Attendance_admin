@@ -21,35 +21,19 @@ from functools import wraps
 #   MAIL_SENDER_EMAIL=your-account@gmail.com
 #   MAIL_SENDER_PASSWORD=<gmail app password, NOT your login password>
 #   MAIL_RECIPIENT_EMAIL=recipient@example.com
-#
-# If a Gmail account password (not a generated "App Password") was ever
-# committed to source control or shared in plaintext anywhere, treat it as
-# compromised and rotate/regenerate it in your Google Account security
-# settings immediately, regardless of whether this app is public.
 
 
 # ---------------------------------------------------------------------------
 # Timezone
 # ---------------------------------------------------------------------------
-# Render's servers (and most hosts) run in UTC regardless of your local
-# machine's clock. datetime.now() on such hosts therefore returns UTC time,
-# not IST. Use get_local_time() everywhere instead of datetime.now() so
-# check-in/out times and dates are correct both locally and in production.
 def get_local_time():
     """Return current time in IST (UTC+5:30) as a datetime object."""
     return datetime.utcnow() + timedelta(hours=5, minutes=30)
 
 
-# Loads variables from a local .env file (if present) into os.environ, so
-# MAIL_SENDER_EMAIL / MAIL_SENDER_PASSWORD / MAIL_RECIPIENT_EMAIL etc. can be
-# set once in .env instead of exporting them in every terminal session.
-# In production this is a harmless no-op — set the real variables in your
-# host's dashboard instead of relying on a .env file.
-# Requires: pip install python-dotenv
 from dotenv import load_dotenv
 load_dotenv()
 
-# this for templates or html page adding by flask
 from flask import (
     Flask, render_template, request, redirect, url_for, session,
     flash, send_file, abort
@@ -59,45 +43,17 @@ import db
 
 app = Flask(__name__, static_folder='static', instance_relative_config=True)
 
-# NOTE: pull the secret key from the environment in production. Falling back
-# to a hardcoded string is fine for local dev only.
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'crest@#2026')
 
 os.makedirs(app.instance_path, exist_ok=True)
 
-# On Render, the container's filesystem is wiped on every deploy/restart —
-# add a Render "Disk" (Dashboard -> your service -> Disks) mounted at, say,
-# /var/data, then set the env var DATA_DIR=/var/data so data.db survives
-# deploys. Falls back to the normal Flask instance folder if DATA_DIR isn't
-# set (fine for local dev, NOT fine for a production Render deploy without
-# a disk attached — you will lose all data on the next deploy).
 _data_dir = os.environ.get('DATA_DIR', app.instance_path)
 os.makedirs(_data_dir, exist_ok=True)
 app.config['DATABASE'] = os.path.join(_data_dir, 'data.db')
 
-# NOTE: app.debug must be set HERE (config time), not as a kwarg to
-# app.run() further down — the scheduler guard near the bottom of this
-# file reads app.debug at import time, before app.run() ever executes, so
-# if debug were only set via app.run(debug=True) it would still read as
-# False in both of the reloader's processes and the guard would do
-# nothing (this was the root cause of the duplicate-email bug).
 app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
 db.init_app(app)
-
-# ---------------------------------------------------------------------------
-# Mobile JSON API (used by the Flutter app) — everything under /api/*.
-# The original server-rendered pages above are untouched and keep working
-# exactly as before; the API is an additive layer that reuses the same
-# db.py / schema.sql / data.db.
-# ---------------------------------------------------------------------------
-from flask_cors import CORS
-from api import api_bp, init_jwt
-
-CORS(app, resources={r"/api/*": {"origins": "*"}})
-init_jwt(app)
-app.register_blueprint(api_bp)
-
 
 
 # ---------------------------------------------------------------------------
@@ -127,11 +83,6 @@ def roles_required(*allowed_roles):
 
 
 def build_xlsx_buffer(headers, rows):
-    """Build an in-memory .xlsx workbook and return its BytesIO buffer.
-
-    Shared by the download routes (via make_xlsx_response) and the email
-    route (which needs the raw bytes to attach rather than send_file).
-    """
     wb = Workbook()
     ws = wb.active
     ws.append(headers)
@@ -161,11 +112,6 @@ def make_xlsx_response(headers, rows, filename):
 
 
 def format_date_ddmmyyyy(value):
-    """Convert a 'YYYY-MM-DD' string to 'DD-MM-YYYY' for Excel display.
-
-    Leaves the value untouched if it's empty/None or doesn't match the
-    expected format (so we never crash the export on odd/legacy data).
-    """
     if not value:
         return value
     try:
@@ -175,12 +121,6 @@ def format_date_ddmmyyyy(value):
 
 
 def format_datetime_ddmmyyyy(value):
-    """Convert a 'YYYY-MM-DD HH:MM:SS' string to 12hr AM/PM
-    'DD-MM-YYYY HH:MM:SS AM/PM'.
-
-    Leaves the value untouched if it's empty/None or doesn't match the
-    expected format.
-    """
     if not value:
         return value
     try:
@@ -208,13 +148,6 @@ def get_attendance_or_404(attendance_id):
 
 
 def get_current_employee():
-    """Resolve the logged-in user to an employees row, if any.
-
-    Prefers the explicit users.linked_employee_id set from Add/Edit User.
-    Falls back to matching by name/employee code (mirrors the old
-    behaviour in the leave() view) so existing accounts keep working
-    without needing to be re-linked by hand.
-    """
     username = session.get('username')
     if not username:
         return None
@@ -233,11 +166,6 @@ ATTENDANCE_STATUSES = ['Present', 'Half Day', 'Leave', 'Absent']
 
 
 def normalize_time_for_input(time_str):
-    """Convert whatever format a time was stored in (12-hour AM/PM from the
-    punch clock, or 24-hour HH:MM/HH:MM:SS from the admin add/edit form)
-    into HH:MM, which is what an HTML <input type="time"> expects. Without
-    this, editing a record that was created via check-in/check-out shows
-    the time field as blank because the browser can't parse "09:15:00 AM"."""
     if not time_str:
         return ''
     time_str = str(time_str).strip()
@@ -250,8 +178,6 @@ def normalize_time_for_input(time_str):
 
 
 def _normalized_attendance_record(record):
-    """sqlite3.Row is read-only, so build a plain dict copy with the time
-    fields normalized for the HTML <input type="time"> on the edit form."""
     d = dict(record)
     d['check_in'] = normalize_time_for_input(d.get('check_in'))
     d['check_out'] = normalize_time_for_input(d.get('check_out'))
@@ -783,13 +709,8 @@ def attendance_calendar():
             iso = f'{year:04d}-{month:02d}-{day_num:02d}'
             info = day_status.get(iso)
             holiday_name = holiday_map.get(iso)
-            is_sunday = datetime(year, month, day_num).weekday() == 6  # Monday=0 ... Sunday=6
+            is_sunday = datetime(year, month, day_num).weekday() == 6
 
-            # Priority: an actual punched-in record always wins — an employee
-            # who came in on a Sunday or a declared holiday still shows their
-            # real attendance, just tagged as "worked on holiday/weekend" so
-            # nothing gets hidden. Only fall back to the Holiday/Weekend
-            # label when nobody actually checked in that day.
             if info:
                 status_label = info['status']
                 css = (info['status'] or '').lower().replace(' ', '')
