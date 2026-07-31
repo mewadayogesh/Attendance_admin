@@ -1,7 +1,13 @@
 Flask==3.0.3
 openpyxl==3.1.5
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 PyJWT==2.9.0
 Flask-Cors==4.0.1
 APScheduler==3.11.0
 gunicorn==22.0.0
+Werkzeug==3.1.8
+Jinja2==3.1.6
+itsdangerous==2.2.0
+click==8.4.2
+blinker==1.9.0
+requests==2.31.0
