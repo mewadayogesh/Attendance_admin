@@ -63,9 +63,40 @@ app = Flask(__name__, static_folder='static', instance_relative_config=True)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'crest@#2026')
 
 os.makedirs(app.instance_path, exist_ok=True)
-app.config['DATABASE'] = os.path.join(app.instance_path, 'data.db')
+
+# On Render, the container's filesystem is wiped on every deploy/restart —
+# add a Render "Disk" (Dashboard -> your service -> Disks) mounted at, say,
+# /var/data, then set the env var DATA_DIR=/var/data so data.db survives
+# deploys. Falls back to the normal Flask instance folder if DATA_DIR isn't
+# set (fine for local dev, NOT fine for a production Render deploy without
+# a disk attached — you will lose all data on the next deploy).
+_data_dir = os.environ.get('DATA_DIR', app.instance_path)
+os.makedirs(_data_dir, exist_ok=True)
+app.config['DATABASE'] = os.path.join(_data_dir, 'data.db')
+
+# NOTE: app.debug must be set HERE (config time), not as a kwarg to
+# app.run() further down — the scheduler guard near the bottom of this
+# file reads app.debug at import time, before app.run() ever executes, so
+# if debug were only set via app.run(debug=True) it would still read as
+# False in both of the reloader's processes and the guard would do
+# nothing (this was the root cause of the duplicate-email bug).
+app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
 db.init_app(app)
+
+# ---------------------------------------------------------------------------
+# Mobile JSON API (used by the Flutter app) — everything under /api/*.
+# The original server-rendered pages above are untouched and keep working
+# exactly as before; the API is an additive layer that reuses the same
+# db.py / schema.sql / data.db.
+# ---------------------------------------------------------------------------
+from flask_cors import CORS
+from api import api_bp, init_jwt
+
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+init_jwt(app)
+app.register_blueprint(api_bp)
+
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +229,32 @@ def get_current_employee():
 
 
 ATTENDANCE_STATUSES = ['Present', 'Half Day', 'Leave', 'Absent']
+
+
+def normalize_time_for_input(time_str):
+    """Convert whatever format a time was stored in (12-hour AM/PM from the
+    punch clock, or 24-hour HH:MM/HH:MM:SS from the admin add/edit form)
+    into HH:MM, which is what an HTML <input type="time"> expects. Without
+    this, editing a record that was created via check-in/check-out shows
+    the time field as blank because the browser can't parse "09:15:00 AM"."""
+    if not time_str:
+        return ''
+    time_str = str(time_str).strip()
+    for fmt in ('%H:%M:%S', '%H:%M', '%I:%M:%S %p', '%I:%M %p'):
+        try:
+            return datetime.strptime(time_str, fmt).strftime('%H:%M')
+        except ValueError:
+            continue
+    return time_str[:5] if len(time_str) >= 5 else time_str
+
+
+def _normalized_attendance_record(record):
+    """sqlite3.Row is read-only, so build a plain dict copy with the time
+    fields normalized for the HTML <input type="time"> on the edit form."""
+    d = dict(record)
+    d['check_in'] = normalize_time_for_input(d.get('check_in'))
+    d['check_out'] = normalize_time_for_input(d.get('check_out'))
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -843,24 +900,6 @@ def delete_holiday(holiday_id):
 # ---------------------------------------------------------------------------
 # Attendance — admin/editor management (fix missed check-ins/outs)
 # ---------------------------------------------------------------------------
-from datetime import datetime
-
-def normalize_time_for_input(time_str):
-    """Helper to convert various time formats (12-hour AM/PM, text, etc.) into HH:MM for HTML time inputs."""
-    if not time_str:
-        return ''
-    time_str = str(time_str).strip()
-    
-    # Try multiple common formats stored in the database
-    for fmt in ('%H:%M:%S', '%H:%M', '%I:%M:%S %p', '%I:%M %p'):
-        try:
-            return datetime.strptime(time_str, fmt).strftime('%H:%M')
-        except ValueError:
-            continue
-            
-    # Fallback: if it's already close or just return as is if parsing fails
-    return time_str[:5] if len(time_str) >= 5 else time_str
-
 
 @app.route('/report/attendance')
 @login_required
@@ -1000,12 +1039,7 @@ def edit_attendance(attendance_id):
         flash('Attendance record updated successfully.', 'success')
         return redirect(url_for('report_attendance'))
 
-    # Normalize times so HTML input elements can understand and display them properly
-    record_dict = dict(record)
-    record_dict['check_in'] = normalize_time_for_input(record_dict.get('check_in'))
-    record_dict['check_out'] = normalize_time_for_input(record_dict.get('check_out'))
-
-    return render_template('attendance_edit.html', record=record_dict, employee=employee, statuses=ATTENDANCE_STATUSES)
+    return render_template('attendance_edit.html', record=_normalized_attendance_record(record), employee=employee, statuses=ATTENDANCE_STATUSES)
 
 
 @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
@@ -1016,156 +1050,6 @@ def delete_attendance(attendance_id):
     conn.commit()
     flash('Attendance record deleted.', 'success')
     return redirect(url_for('report_attendance'))
-#old code
-# @app.route('/report/attendance')
-# @login_required
-# def report_attendance():
-#     """Attendance report.
-
-#     - Users always see only their own linked-employee attendance.
-#     - Admin/editor see everyone by default, can narrow with the
-#       ?employee_id=<id> dropdown filter, and/or can free-text search by
-#       the employee's custom Employee ID via ?search_emp_id=<text>
-#       (partial, case-insensitive match, e.g. 'd1' matches 'EMP-D101').
-#       Both filters can be combined.
-#     """
-#     conn = db.get_db()
-#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
-
-#     base_query = '''
-#         SELECT a.*, e.name AS employee_name, e.employee_id AS custom_emp_id
-#         FROM attendance a
-#         LEFT JOIN employees e ON a.employee_id = e.id
-#     '''
-
-#     params = []
-#     where_clauses = []
-#     filter_employee_id = None
-#     search_emp_id = request.args.get('search_emp_id', '').strip()
-
-#     if session.get('role') == 'user':
-#         my_employee = get_current_employee()
-#         filter_employee_id = my_employee['id'] if my_employee else -1
-#         where_clauses.append('a.employee_id = ?')
-#         params.append(filter_employee_id)
-#     else:
-#         requested = request.args.get('employee_id', '').strip()
-#         if requested:
-#             filter_employee_id = int(requested)
-#             where_clauses.append('a.employee_id = ?')
-#             params.append(filter_employee_id)
-
-#     if search_emp_id:
-#         where_clauses.append('e.employee_id LIKE ?')
-#         params.append(f'%{search_emp_id}%')
-
-#     if where_clauses:
-#         base_query += ' WHERE ' + ' AND '.join(where_clauses)
-#     base_query += ' ORDER BY a.work_date DESC, a.id DESC'
-
-#     records = conn.execute(base_query, params).fetchall()
-
-#     viewing_employee_name = None
-#     if filter_employee_id:
-#         emp_row = conn.execute('SELECT name FROM employees WHERE id = ?', (filter_employee_id,)).fetchone()
-#         viewing_employee_name = emp_row['name'] if emp_row else None
-
-#     return render_template(
-#         'report_attendance.html',
-#         records=records,
-#         employees=employees,
-#         filter_employee_id=filter_employee_id,
-#         search_emp_id=search_emp_id,
-#         viewing_employee_name=viewing_employee_name,
-#         user_role=session.get('role'),
-#     )
-
-
-# @app.route('/attendance/add', methods=['GET', 'POST'])
-# @roles_required('admin', 'editor')
-# def add_attendance():
-#     conn = db.get_db()
-#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
-
-#     if request.method == 'POST':
-#         employee_id = request.form.get('employee_id', '').strip()
-#         work_date = request.form.get('work_date', '').strip()
-#         check_in = request.form.get('check_in', '').strip() or None
-#         check_out = request.form.get('check_out', '').strip() or None
-#         status = request.form.get('status', 'Present').strip()
-
-#         if not employee_id or not work_date:
-#             flash('Employee and date are required.', 'error')
-#             return render_template('attendance_add.html', employees=employees)
-
-#         existing = conn.execute(
-#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ?', (employee_id, work_date)
-#         ).fetchone()
-#         if existing:
-#             flash('An attendance record already exists for that employee and date — edit it instead.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=existing['id']))
-
-#         local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
-#         conn.execute(
-#             'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status, created_at) '
-#             'VALUES (?, ?, ?, ?, ?, ?)',
-#             (employee_id, work_date, check_in, check_out, status, local_timestamp),
-#         )
-#         conn.commit()
-#         flash('Attendance record added successfully.', 'success')
-#         return redirect(url_for('report_attendance'))
-
-#     return render_template('attendance_add.html', employees=employees)
-
-
-# @app.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
-# @roles_required('admin', 'editor')
-# def edit_attendance(attendance_id):
-#     record = get_attendance_or_404(attendance_id)
-#     if record is None:
-#         flash('That attendance record no longer exists.', 'error')
-#         return redirect(url_for('report_attendance'))
-
-#     conn = db.get_db()
-#     employee = conn.execute('SELECT * FROM employees WHERE id = ?', (record['employee_id'],)).fetchone()
-
-#     if request.method == 'POST':
-#         work_date = request.form.get('work_date', '').strip()
-#         check_in = request.form.get('check_in', '').strip() or None
-#         check_out = request.form.get('check_out', '').strip() or None
-#         status = request.form.get('status', 'Present').strip()
-
-#         if not work_date:
-#             flash('Date is required.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
-
-#         duplicate = conn.execute(
-#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ? AND id != ?',
-#             (record['employee_id'], work_date, attendance_id)
-#         ).fetchone()
-#         if duplicate:
-#             flash('Another attendance record already exists for that employee and date.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
-
-#         conn.execute(
-#             'UPDATE attendance SET work_date = ?, check_in = ?, check_out = ?, status = ? WHERE id = ?',
-#             (work_date, check_in, check_out, status, attendance_id),
-#         )
-#         conn.commit()
-#         flash('Attendance record updated successfully.', 'success')
-#         return redirect(url_for('report_attendance'))
-
-#     return render_template('attendance_edit.html', record=record, employee=employee, statuses=ATTENDANCE_STATUSES)
-
-
-# @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
-# @roles_required('admin', 'editor')
-# def delete_attendance(attendance_id):
-#     conn = db.get_db()
-#     conn.execute('DELETE FROM attendance WHERE id = ?', (attendance_id,))
-#     conn.commit()
-#     flash('Attendance record deleted.', 'success')
-#     return redirect(url_for('report_attendance'))
 
 
 # ---------------------------------------------------------------------------
@@ -1500,5 +1384,28 @@ def debug_env_check():
     }
 
 
+# ---------------------------------------------------------------------------
+# Automated monthly report emails (background scheduler)
+# ---------------------------------------------------------------------------
+# THE FIX FOR "EMAIL SENDS TWICE":
+# app.run(debug=True) starts Flask's reloader, which runs your app in TWO
+# processes (a file-watching monitor + the real worker). If the scheduler
+# started unconditionally, both processes would run their own copy of it,
+# so every scheduled email would go out twice. WERKZEUG_RUN_MAIN is only
+# set to 'true' in the real worker process, so gating on it means the
+# scheduler starts exactly once — whether the reloader is on or off.
+from scheduler import init_mail_scheduler
+
+if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    init_mail_scheduler(app, testing_mode=os.environ.get('MAIL_SCHEDULER_TEST_MODE', '').lower() == 'true')
+
+
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5001, debug=True)
+    # Render (and most PaaS hosts) assign the port dynamically via $PORT and
+    # only route traffic to 0.0.0.0 — 127.0.0.1 is not reachable from
+    # outside the container. app.config['DEBUG'] (set near the top of this
+    # file, defaulting to false) is the single source of truth for debug
+    # mode — reusing it here instead of re-reading FLASK_DEBUG keeps the
+    # scheduler guard and this app.run() call from ever disagreeing.
+    port = int(os.environ.get('PORT', 5001))
+    app.run(host='0.0.0.0', port=port, debug=app.config['DEBUG'])
