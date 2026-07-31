@@ -1,9 +1,6 @@
 Flask==3.0.3
 openpyxl==3.1.5
 gunicorn
-python-dotenv
-gunicorn
-Flask==3.0.3
 Jinja2==3.1.6
 MarkupSafe==3.0.3
 Werkzeug==3.1.8
