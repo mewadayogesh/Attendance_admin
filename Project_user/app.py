@@ -1265,7 +1265,7 @@ def send_report_email():
         server.quit()
 
         flash('Attendance and leave reports sent to your email successfully!', 'success')
-except Exception as e:
+    except Exception as e:
         app.logger.error("send_report_email failed: %s", e)
         tb = traceback.format_exc()
         print(tb)
