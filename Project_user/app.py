@@ -1424,81 +1424,146 @@ def send_report_email():
 # ---------------------------------------------------------------------------
 # Email — send attendance report only as an .xlsx attachment
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Email Report Route
+# ---------------------------------------------------------------------------
 
-@app.route('/send-attendance-email', methods=['POST'])
-@login_required
-def send_attendance_email():
-    """Email the current attendance report (as an .xlsx attachment) to the
-    configured recipient. Credentials come from environment variables set
-    on your host (MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD, MAIL_RECIPIENT_EMAIL).
-
-    Redirects back to whichever page the form was submitted from (works
-    whether the "Send Report to My Email" button lives on the reports
-    overview page, the leave request page, or both), falling back to
-    report_leave if the referrer can't be determined.
-    """
-    sender_email = os.environ.get('MAIL_SENDER_EMAIL')
-    sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
-    recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-
-    fallback_endpoint = url_for('report_leave')
-    redirect_target = request.referrer or fallback_endpoint
-
-    if not sender_email or not sender_password or not recipient_email:
-        flash('Email is not configured on the server. Check environment variables.', 'error')
-        return redirect(redirect_target)
-
+@app.route('/send-report-email', methods=['GET', 'POST'])
+@roles_required('admin')
+def send_report_email():
     try:
-        # Build the same attendance report the download button produces
-        headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-        xlsx_buffer = build_xlsx_buffer(headers, data)
+        conn = db.get_db()
+        
+        # 1. Fetch data you want to include in the Excel report (e.g., all employees and attendance)
+        employees = conn.execute('SELECT * FROM employees ORDER BY id ASC').fetchall()
+        
+        headers = ['ID', 'Employee ID', 'Name', 'Designation', 'DOB', 'Date of Joining', 'Created At']
+        rows = [
+            [e['id'], e['employee_id'], e['name'], e['designation'], 
+             format_date_ddmmyyyy(e['dob']), format_date_ddmmyyyy(e['date_of_joining']), 
+             format_datetime_ddmmyyyy(e['created_at'])]
+            for e in employees
+        ]
 
-        subject = "Attendance Report"
-        sent_at = get_local_time().strftime('%d-%m-%Y %I:%M:%S %p')
-        body = (
-            "Hello,\n\n"
-            "Please find your requested attendance report attached.\n\n"
-            f"Report generated: {sent_at} (IST)\n\n"
-            "Best Regards,\nHR System"
-        )
+        # 2. Build the Excel file buffer in memory
+        excel_buffer = build_xlsx_buffer(headers, rows)
 
+        # 3. Pull email settings securely from environment variables
+        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+        mail_port = int(os.environ.get('MAIL_PORT', 587))
+        sender_email = os.environ.get('MAIL_SENDER_EMAIL')
+        sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
+        recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
+
+        if not sender_email or not sender_password or not recipient_email:
+            flash('Email configuration environment variables are missing on Render.', 'error')
+            return redirect(url_for('dashboard'))
+
+        # 4. Construct the multipart email message with attachment
         msg = MIMEMultipart()
+        msg['Subject'] = f"Attendance & Employee Report - {get_local_time().strftime('%Y-%m-%d')}"
         msg['From'] = sender_email
         msg['To'] = recipient_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
 
-        attachment = MIMEBase('application', 'octet-stream')
-        attachment.set_payload(xlsx_buffer.read())
+        body = MIMEText("Please find attached the latest system report generated from your Attendance Admin portal.")
+        msg.attach(body)
+
+        # Attach the Excel workbook
+        attachment = MIMEBase('application', 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        attachment.set_payload(excel_buffer.read())
         encoders.encode_base64(attachment)
-        attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+        attachment.add_header('Content-Disposition', 'attachment', filename='employee_report.xlsx')
         msg.attach(attachment)
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
-        server.quit()
+        # 5. Connect to SMTP server and send
+        with smtplib.SMTP(mail_server, mail_port) as server:
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.send_message(msg)
 
-        flash('Attendance report sent to your email successfully!', 'success')
+        flash('Report email sent successfully!', 'success')
+        return redirect(url_for('dashboard'))
+
     except Exception as e:
-        # Full traceback goes to server logs; the user just sees a short,
-        # non-technical flash message.
-        app.logger.error("send_attendance_email failed: %s", e)
+        # Prints traceback to Render logs for easy debugging
         traceback.print_exc()
-        flash(f'Failed to send email: {e}', 'error')
+        flash(f'Failed to send email: {str(e)}', 'error')
+        return f"Internal Server Error: {str(e)}", 500
+#old code
+# @app.route('/send-attendance-email', methods=['POST'])
+# @login_required
+# def send_attendance_email():
+#     """Email the current attendance report (as an .xlsx attachment) to the
+#     configured recipient. Credentials come from environment variables set
+#     on your host (MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD, MAIL_RECIPIENT_EMAIL).
 
-    return redirect(redirect_target)
+#     Redirects back to whichever page the form was submitted from (works
+#     whether the "Send Report to My Email" button lives on the reports
+#     overview page, the leave request page, or both), falling back to
+#     report_leave if the referrer can't be determined.
+#     """
+#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
+#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
+#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
+
+#     fallback_endpoint = url_for('report_leave')
+#     redirect_target = request.referrer or fallback_endpoint
+
+#     if not sender_email or not sender_password or not recipient_email:
+#         flash('Email is not configured on the server. Check environment variables.', 'error')
+#         return redirect(redirect_target)
+
+#     try:
+#         # Build the same attendance report the download button produces
+#         headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
+#         xlsx_buffer = build_xlsx_buffer(headers, data)
+
+#         subject = "Attendance Report"
+#         sent_at = get_local_time().strftime('%d-%m-%Y %I:%M:%S %p')
+#         body = (
+#             "Hello,\n\n"
+#             "Please find your requested attendance report attached.\n\n"
+#             f"Report generated: {sent_at} (IST)\n\n"
+#             "Best Regards,\nHR System"
+#         )
+
+#         msg = MIMEMultipart()
+#         msg['From'] = sender_email
+#         msg['To'] = recipient_email
+#         msg['Subject'] = subject
+#         msg.attach(MIMEText(body, 'plain'))
+
+#         attachment = MIMEBase('application', 'octet-stream')
+#         attachment.set_payload(xlsx_buffer.read())
+#         encoders.encode_base64(attachment)
+#         attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+#         msg.attach(attachment)
+
+#         server = smtplib.SMTP('smtp.gmail.com', 587)
+#         server.starttls()
+#         server.login(sender_email, sender_password)
+#         server.sendmail(sender_email, recipient_email, msg.as_string())
+#         server.quit()
+
+#         flash('Attendance report sent to your email successfully!', 'success')
+#     except Exception as e:
+#         # Full traceback goes to server logs; the user just sees a short,
+#         # non-technical flash message.
+#         app.logger.error("send_attendance_email failed: %s", e)
+#         traceback.print_exc()
+#         flash(f'Failed to send email: {e}', 'error')
+
+#     return redirect(redirect_target)
 
 
-@app.route('/debug-env-check')
-@login_required
-def debug_env_check():
-    return {
-        'MAIL_SENDER_EMAIL_set': bool(os.environ.get('MAIL_SENDER_EMAIL')),
-        'MAIL_SENDER_PASSWORD_set': bool(os.environ.get('MAIL_SENDER_PASSWORD')),
-        'MAIL_RECIPIENT_EMAIL_set': bool(os.environ.get('MAIL_RECIPIENT_EMAIL')),
-    }
+# @app.route('/debug-env-check')
+# @login_required
+# def debug_env_check():
+#     return {
+#         'MAIL_SENDER_EMAIL_set': bool(os.environ.get('MAIL_SENDER_EMAIL')),
+#         'MAIL_SENDER_PASSWORD_set': bool(os.environ.get('MAIL_SENDER_PASSWORD')),
+#         'MAIL_RECIPIENT_EMAIL_set': bool(os.environ.get('MAIL_RECIPIENT_EMAIL')),
+#     }
 
 
 if __name__ == '__main__':
