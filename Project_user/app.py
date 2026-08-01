@@ -1265,10 +1265,11 @@ def send_report_email():
         server.quit()
 
         flash('Attendance and leave reports sent to your email successfully!', 'success')
-    except Exception as e:
+except Exception as e:
         app.logger.error("send_report_email failed: %s", e)
-        traceback.print_exc()
-        flash(f'Failed to send email: {e}', 'error')
+        tb = traceback.format_exc()
+        print(tb)
+        return f"<pre>{tb}</pre>", 500
 
     return redirect(redirect_target)
 
