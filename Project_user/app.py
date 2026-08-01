@@ -844,21 +844,20 @@ def delete_holiday(holiday_id):
 # ---------------------------------------------------------------------------
 # Attendance — admin/editor management (fix missed check-ins/outs)
 # ---------------------------------------------------------------------------
-from datetime import datetime
 
 def normalize_time_for_input(time_str):
     """Helper to convert various time formats (12-hour AM/PM, text, etc.) into HH:MM for HTML time inputs."""
     if not time_str:
         return ''
     time_str = str(time_str).strip()
-    
+
     # Try multiple common formats stored in the database
     for fmt in ('%H:%M:%S', '%H:%M', '%I:%M:%S %p', '%I:%M %p'):
         try:
             return datetime.strptime(time_str, fmt).strftime('%H:%M')
         except ValueError:
             continue
-            
+
     # Fallback: if it's already close or just return as is if parsing fails
     return time_str[:5] if len(time_str) >= 5 else time_str
 
@@ -1017,156 +1016,6 @@ def delete_attendance(attendance_id):
     conn.commit()
     flash('Attendance record deleted.', 'success')
     return redirect(url_for('report_attendance'))
-#old code
-# @app.route('/report/attendance')
-# @login_required
-# def report_attendance():
-#     """Attendance report.
-
-#     - Users always see only their own linked-employee attendance.
-#     - Admin/editor see everyone by default, can narrow with the
-#       ?employee_id=<id> dropdown filter, and/or can free-text search by
-#       the employee's custom Employee ID via ?search_emp_id=<text>
-#       (partial, case-insensitive match, e.g. 'd1' matches 'EMP-D101').
-#       Both filters can be combined.
-#     """
-#     conn = db.get_db()
-#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
-
-#     base_query = '''
-#         SELECT a.*, e.name AS employee_name, e.employee_id AS custom_emp_id
-#         FROM attendance a
-#         LEFT JOIN employees e ON a.employee_id = e.id
-#     '''
-
-#     params = []
-#     where_clauses = []
-#     filter_employee_id = None
-#     search_emp_id = request.args.get('search_emp_id', '').strip()
-
-#     if session.get('role') == 'user':
-#         my_employee = get_current_employee()
-#         filter_employee_id = my_employee['id'] if my_employee else -1
-#         where_clauses.append('a.employee_id = ?')
-#         params.append(filter_employee_id)
-#     else:
-#         requested = request.args.get('employee_id', '').strip()
-#         if requested:
-#             filter_employee_id = int(requested)
-#             where_clauses.append('a.employee_id = ?')
-#             params.append(filter_employee_id)
-
-#     if search_emp_id:
-#         where_clauses.append('e.employee_id LIKE ?')
-#         params.append(f'%{search_emp_id}%')
-
-#     if where_clauses:
-#         base_query += ' WHERE ' + ' AND '.join(where_clauses)
-#     base_query += ' ORDER BY a.work_date DESC, a.id DESC'
-
-#     records = conn.execute(base_query, params).fetchall()
-
-#     viewing_employee_name = None
-#     if filter_employee_id:
-#         emp_row = conn.execute('SELECT name FROM employees WHERE id = ?', (filter_employee_id,)).fetchone()
-#         viewing_employee_name = emp_row['name'] if emp_row else None
-
-#     return render_template(
-#         'report_attendance.html',
-#         records=records,
-#         employees=employees,
-#         filter_employee_id=filter_employee_id,
-#         search_emp_id=search_emp_id,
-#         viewing_employee_name=viewing_employee_name,
-#         user_role=session.get('role'),
-#     )
-
-
-# @app.route('/attendance/add', methods=['GET', 'POST'])
-# @roles_required('admin', 'editor')
-# def add_attendance():
-#     conn = db.get_db()
-#     employees = conn.execute('SELECT * FROM employees ORDER BY name ASC').fetchall()
-
-#     if request.method == 'POST':
-#         employee_id = request.form.get('employee_id', '').strip()
-#         work_date = request.form.get('work_date', '').strip()
-#         check_in = request.form.get('check_in', '').strip() or None
-#         check_out = request.form.get('check_out', '').strip() or None
-#         status = request.form.get('status', 'Present').strip()
-
-#         if not employee_id or not work_date:
-#             flash('Employee and date are required.', 'error')
-#             return render_template('attendance_add.html', employees=employees)
-
-#         existing = conn.execute(
-#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ?', (employee_id, work_date)
-#         ).fetchone()
-#         if existing:
-#             flash('An attendance record already exists for that employee and date — edit it instead.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=existing['id']))
-
-#         local_timestamp = get_local_time().strftime('%Y-%m-%d %H:%M:%S')
-#         conn.execute(
-#             'INSERT INTO attendance (employee_id, work_date, check_in, check_out, status, created_at) '
-#             'VALUES (?, ?, ?, ?, ?, ?)',
-#             (employee_id, work_date, check_in, check_out, status, local_timestamp),
-#         )
-#         conn.commit()
-#         flash('Attendance record added successfully.', 'success')
-#         return redirect(url_for('report_attendance'))
-
-#     return render_template('attendance_add.html', employees=employees)
-
-
-# @app.route('/attendance/<int:attendance_id>/edit', methods=['GET', 'POST'])
-# @roles_required('admin', 'editor')
-# def edit_attendance(attendance_id):
-#     record = get_attendance_or_404(attendance_id)
-#     if record is None:
-#         flash('That attendance record no longer exists.', 'error')
-#         return redirect(url_for('report_attendance'))
-
-#     conn = db.get_db()
-#     employee = conn.execute('SELECT * FROM employees WHERE id = ?', (record['employee_id'],)).fetchone()
-
-#     if request.method == 'POST':
-#         work_date = request.form.get('work_date', '').strip()
-#         check_in = request.form.get('check_in', '').strip() or None
-#         check_out = request.form.get('check_out', '').strip() or None
-#         status = request.form.get('status', 'Present').strip()
-
-#         if not work_date:
-#             flash('Date is required.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
-
-#         duplicate = conn.execute(
-#             'SELECT id FROM attendance WHERE employee_id = ? AND work_date = ? AND id != ?',
-#             (record['employee_id'], work_date, attendance_id)
-#         ).fetchone()
-#         if duplicate:
-#             flash('Another attendance record already exists for that employee and date.', 'error')
-#             return redirect(url_for('edit_attendance', attendance_id=attendance_id))
-
-#         conn.execute(
-#             'UPDATE attendance SET work_date = ?, check_in = ?, check_out = ?, status = ? WHERE id = ?',
-#             (work_date, check_in, check_out, status, attendance_id),
-#         )
-#         conn.commit()
-#         flash('Attendance record updated successfully.', 'success')
-#         return redirect(url_for('report_attendance'))
-
-#     return render_template('attendance_edit.html', record=record, employee=employee, statuses=ATTENDANCE_STATUSES)
-
-
-# @app.route('/attendance/<int:attendance_id>/delete', methods=['POST'])
-# @roles_required('admin', 'editor')
-# def delete_attendance(attendance_id):
-#     conn = db.get_db()
-#     conn.execute('DELETE FROM attendance WHERE id = ?', (attendance_id,))
-#     conn.commit()
-#     flash('Attendance record deleted.', 'success')
-#     return redirect(url_for('report_attendance'))
 
 
 # ---------------------------------------------------------------------------
@@ -1381,6 +1230,9 @@ def send_report_email():
         leave_headers, leave_data, leave_filename = _build_leave_report(role, username)
         leave_buffer = build_xlsx_buffer(leave_headers, leave_data)
 
+        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+        mail_port = int(os.environ.get('MAIL_PORT', 587))
+
         subject = "Attendance & Leave Reports"
         sent_at = get_local_time().strftime('%d-%m-%Y %I:%M:%S %p')
         body = (
@@ -1406,7 +1258,7 @@ def send_report_email():
             attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
             msg.attach(attachment)
 
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server = smtplib.SMTP(mail_server, mail_port)
         server.starttls()
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, recipient_email, msg.as_string())
@@ -1419,151 +1271,6 @@ def send_report_email():
         flash(f'Failed to send email: {e}', 'error')
 
     return redirect(redirect_target)
-
-
-# ---------------------------------------------------------------------------
-# Email — send attendance report only as an .xlsx attachment
-# ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Email Report Route
-# ---------------------------------------------------------------------------
-
-@app.route('/send-report-email', methods=['GET', 'POST'])
-@roles_required('admin')
-def send_report_email():
-    try:
-        conn = db.get_db()
-        
-        # 1. Fetch data you want to include in the Excel report (e.g., all employees and attendance)
-        employees = conn.execute('SELECT * FROM employees ORDER BY id ASC').fetchall()
-        
-        headers = ['ID', 'Employee ID', 'Name', 'Designation', 'DOB', 'Date of Joining', 'Created At']
-        rows = [
-            [e['id'], e['employee_id'], e['name'], e['designation'], 
-             format_date_ddmmyyyy(e['dob']), format_date_ddmmyyyy(e['date_of_joining']), 
-             format_datetime_ddmmyyyy(e['created_at'])]
-            for e in employees
-        ]
-
-        # 2. Build the Excel file buffer in memory
-        excel_buffer = build_xlsx_buffer(headers, rows)
-
-        # 3. Pull email settings securely from environment variables
-        mail_server = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-        mail_port = int(os.environ.get('MAIL_PORT', 587))
-        sender_email = os.environ.get('MAIL_SENDER_EMAIL')
-        sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
-        recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-
-        if not sender_email or not sender_password or not recipient_email:
-            flash('Email configuration environment variables are missing on Render.', 'error')
-            return redirect(url_for('dashboard'))
-
-        # 4. Construct the multipart email message with attachment
-        msg = MIMEMultipart()
-        msg['Subject'] = f"Attendance & Employee Report - {get_local_time().strftime('%Y-%m-%d')}"
-        msg['From'] = sender_email
-        msg['To'] = recipient_email
-
-        body = MIMEText("Please find attached the latest system report generated from your Attendance Admin portal.")
-        msg.attach(body)
-
-        # Attach the Excel workbook
-        attachment = MIMEBase('application', 'vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        attachment.set_payload(excel_buffer.read())
-        encoders.encode_base64(attachment)
-        attachment.add_header('Content-Disposition', 'attachment', filename='employee_report.xlsx')
-        msg.attach(attachment)
-
-        # 5. Connect to SMTP server and send
-        with smtplib.SMTP(mail_server, mail_port) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-
-        flash('Report email sent successfully!', 'success')
-        return redirect(url_for('dashboard'))
-
-    except Exception as e:
-        # Prints traceback to Render logs for easy debugging
-        traceback.print_exc()
-        flash(f'Failed to send email: {str(e)}', 'error')
-        return f"Internal Server Error: {str(e)}", 500
-#old code
-# @app.route('/send-attendance-email', methods=['POST'])
-# @login_required
-# def send_attendance_email():
-#     """Email the current attendance report (as an .xlsx attachment) to the
-#     configured recipient. Credentials come from environment variables set
-#     on your host (MAIL_SENDER_EMAIL, MAIL_SENDER_PASSWORD, MAIL_RECIPIENT_EMAIL).
-
-#     Redirects back to whichever page the form was submitted from (works
-#     whether the "Send Report to My Email" button lives on the reports
-#     overview page, the leave request page, or both), falling back to
-#     report_leave if the referrer can't be determined.
-#     """
-#     sender_email = os.environ.get('MAIL_SENDER_EMAIL')
-#     sender_password = os.environ.get('MAIL_SENDER_PASSWORD')
-#     recipient_email = os.environ.get('MAIL_RECIPIENT_EMAIL')
-
-#     fallback_endpoint = url_for('report_leave')
-#     redirect_target = request.referrer or fallback_endpoint
-
-#     if not sender_email or not sender_password or not recipient_email:
-#         flash('Email is not configured on the server. Check environment variables.', 'error')
-#         return redirect(redirect_target)
-
-#     try:
-#         # Build the same attendance report the download button produces
-#         headers, data, filename = _build_attendance_report(session.get('role'), session.get('username'))
-#         xlsx_buffer = build_xlsx_buffer(headers, data)
-
-#         subject = "Attendance Report"
-#         sent_at = get_local_time().strftime('%d-%m-%Y %I:%M:%S %p')
-#         body = (
-#             "Hello,\n\n"
-#             "Please find your requested attendance report attached.\n\n"
-#             f"Report generated: {sent_at} (IST)\n\n"
-#             "Best Regards,\nHR System"
-#         )
-
-#         msg = MIMEMultipart()
-#         msg['From'] = sender_email
-#         msg['To'] = recipient_email
-#         msg['Subject'] = subject
-#         msg.attach(MIMEText(body, 'plain'))
-
-#         attachment = MIMEBase('application', 'octet-stream')
-#         attachment.set_payload(xlsx_buffer.read())
-#         encoders.encode_base64(attachment)
-#         attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-#         msg.attach(attachment)
-
-#         server = smtplib.SMTP('smtp.gmail.com', 587)
-#         server.starttls()
-#         server.login(sender_email, sender_password)
-#         server.sendmail(sender_email, recipient_email, msg.as_string())
-#         server.quit()
-
-#         flash('Attendance report sent to your email successfully!', 'success')
-#     except Exception as e:
-#         # Full traceback goes to server logs; the user just sees a short,
-#         # non-technical flash message.
-#         app.logger.error("send_attendance_email failed: %s", e)
-#         traceback.print_exc()
-#         flash(f'Failed to send email: {e}', 'error')
-
-#     return redirect(redirect_target)
-
-
-# @app.route('/debug-env-check')
-# @login_required
-# def debug_env_check():
-#     return {
-#         'MAIL_SENDER_EMAIL_set': bool(os.environ.get('MAIL_SENDER_EMAIL')),
-#         'MAIL_SENDER_PASSWORD_set': bool(os.environ.get('MAIL_SENDER_PASSWORD')),
-#         'MAIL_RECIPIENT_EMAIL_set': bool(os.environ.get('MAIL_RECIPIENT_EMAIL')),
-#     }
 
 
 if __name__ == '__main__':
